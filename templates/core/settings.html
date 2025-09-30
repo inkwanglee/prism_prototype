@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">User Information</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Username</dt>
+                    <dd class="col-sm-9">{{ user.username }}</dd>
+                    
+                    <dt class="col-sm-3">Email</dt>
+                    <dd class="col-sm-9">{{ user.email|default:"N/A" }}</dd>
+                    
+                    <dt class="col-sm-3">Roles</dt>
+                    <dd class="col-sm-9">
+                        {% if user_roles %}
+                            {% for role in user_roles %}
+                            <span class="badge bg-primary">{{ role }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-muted">No roles assigned</span>
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-sm-3">Project Access</dt>
+                    <dd class="col-sm-9">
+                        {% if project_ids %}
+                            {% for pid in project_ids %}
+                            <span class="badge bg-secondary">{{ pid }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-muted">No projects assigned</span>
+                        {% endif %}
+                    </dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Resources</h6>
+            </div>
+            <div class="list-group list-group-flush">
+                <a href="/api/schema/docs/" target="_blank" class="list-group-item list-group-item-action">
+                    <i class="bi bi-book"></i> API Documentation
+                </a>
+                <a href="/admin/" target="_blank" class="list-group-item list-group-item-action">
+                    <i class="bi bi-gear"></i> Admin Panel
+                </a>
+                <a href="/metrics" target="_blank" class="list-group-item list-group-item-action">
+                    <i class="bi bi-graph-up"></i> Metrics
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

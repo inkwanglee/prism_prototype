@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Dataset Information</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Key</dt>
+                    <dd class="col-sm-9"><code>{{ dataset.key }}</code></dd>
+                    
+                    <dt class="col-sm-3">Title</dt>
+                    <dd class="col-sm-9">{{ dataset.title }}</dd>
+                    
+                    <dt class="col-sm-3">Schema Reference</dt>
+                    <dd class="col-sm-9"><span class="badge bg-secondary">{{ dataset.schema_ref }}</span></dd>
+                    
+                    <dt class="col-sm-3">Owner</dt>
+                    <dd class="col-sm-9">{{ dataset.owner }}</dd>
+                    
+                    <dt class="col-sm-3">Project ID</dt>
+                    <dd class="col-sm-9">{{ dataset.project_id|default:"N/A" }}</dd>
+                    
+                    <dt class="col-sm-3">Row Count</dt>
+                    <dd class="col-sm-9">{{ dataset.row_count|default:0 }}</dd>
+                    
+                    <dt class="col-sm-3">Status</dt>
+                    <dd class="col-sm-9"><span class="badge bg-success">{{ dataset.get_status_display }}</span></dd>
+                    
+                    <dt class="col-sm-3">Created</dt>
+                    <dd class="col-sm-9">{{ dataset.created_at }}</dd>
+                    
+                    <dt class="col-sm-3">Last Updated</dt>
+                    <dd class="col-sm-9">{{ dataset.last_updated }}</dd>
+                </dl>
+                
+                {% if dataset.description %}
+                <div class="mt-3">
+                    <h6>Description</h6>
+                    <p>{{ dataset.description }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Quick Actions</h6>
+            </div>
+            <div class="list-group list-group-flush">
+                <a href="#" class="list-group-item list-group-item-action">
+                    <i class="bi bi-cloud-upload"></i> Upload Data
+                </a>
+                <a href="#" class="list-group-item list-group-item-action">
+                    <i class="bi bi-download"></i> Export Data
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

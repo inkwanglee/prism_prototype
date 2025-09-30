@@ -1,0 +1,78 @@
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+/staticfiles/
+/media/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.venv
+venv/
+ENV/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker
+.data/
+
+# Poetry
+poetry.lock
+
+# Temporary
+*.tmp
+*.bak
+
+# apps/__init__.py (빈 파일)
+
+# apps/core/__init__.py (빈 파일)
+
+# apps/schemas/__init__.py (빈 파일)
+
+# apps/datasets/__init__.py (빈 파일)
+
+# apps/ingestion/__init__.py (빈 파일)
+
+# apps/qaqc/__init__.py (빈 파일)
+
+# apps/lineage/__init__.py (빈 파일)
+
+# apps/accounts/__init__.py (빈 파일)

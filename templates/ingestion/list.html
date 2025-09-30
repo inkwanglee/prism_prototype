@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        {% if runs %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Source</th>
+                        <th>Status</th>
+                        <th>Total Rows</th>
+                        <th>Success</th>
+                        <th>Failed</th>
+                        <th>Started</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in runs %}
+                    <tr>
+                        <td>{{ run.id }}</td>
+                        <td>{{ run.source }}</td>
+                        <td>
+                            <span class="badge bg-{% if run.status == 'completed' %}success{% elif run.status == 'failed' %}danger{% else %}warning{% endif %}">
+                                {{ run.get_status_display }}
+                            </span>
+                        </td>
+                        <td>{{ run.total_rows }}</td>
+                        <td>{{ run.success_rows }}</td>
+                        <td>{{ run.failed_rows }}</td>
+                        <td>{{ run.started_at|date:"Y-m-d H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-cloud-upload display-1 text-muted"></i>
+            <p class="mt-3 text-muted">No ingestion runs yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

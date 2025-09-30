@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block page_actions %}
+<a href="{% url 'schemas:create' %}" class="btn btn-primary">
+    <i class="bi bi-plus-circle"></i> New Schema
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        {% if schemas %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Key</th>
+                        <th>Owner</th>
+                        <th>Latest Version</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for schema in schemas %}
+                    <tr>
+                        <td>
+                            <strong>{{ schema.key }}</strong>
+                            {% if schema.description %}
+                            <br><small class="text-muted">{{ schema.description|truncatewords:10 }}</small>
+                            {% endif %}
+                        </td>
+                        <td>{{ schema.owner }}</td>
+                        <td>
+                            {% with latest=schema.get_latest_approved_version %}
+                            {% if latest %}
+                                <span class="badge bg-secondary">v{{ latest.version }}</span>
+                            {% else %}
+                                <span class="text-muted">No approved version</span>
+                            {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ schema.versions.count }} version(s)</span>
+                        </td>
+                        <td>{{ schema.created_at|date:"Y-m-d" }}</td>
+                        <td>
+                            <a href="{% url 'schemas:detail' schema.pk %}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox display-1 text-muted"></i>
+            <p class="mt-3 text-muted">No schemas yet. Create your first schema to get started.</p>
+            <a href="{% url 'schemas:create' %}" class="btn btn-primary mt-2">
+                <i class="bi bi-plus-circle"></i> Create Schema
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

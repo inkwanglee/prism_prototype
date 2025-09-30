@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="alert alert-info">
+            <h4 class="alert-heading"><i class="bi bi-info-circle"></i> Welcome to PRISM</h4>
+            <p>Platform for Resource Intelligence & Subsurface Management</p>
+            <hr>
+            <p class="mb-0">Use the sidebar to navigate through different modules.</p>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-2">
+    <!-- Quick Stats -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Schemas</h6>
+                <h2 class="card-title">{{ schemas_count|default:0 }}</h2>
+                <a href="{% url 'schemas:list' %}" class="card-link">View all <i class="bi bi-arrow-right"></i></a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Datasets</h6>
+                <h2 class="card-title">{{ datasets_count|default:0 }}</h2>
+                <a href="{% url 'datasets:list' %}" class="card-link">View all <i class="bi bi-arrow-right"></i></a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Ingestion Runs</h6>
+                <h2 class="card-title">{{ runs_count|default:0 }}</h2>
+                <a href="{% url 'ingestion:list' %}" class="card-link">View all <i class="bi bi-arrow-right"></i></a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">QAQC Status</h6>
+                <h2 class="card-title text-success"><i class="bi bi-check-circle"></i></h2>
+                <a href="{% url 'qaqc:dashboard' %}" class="card-link">View dashboard <i class="bi bi-arrow-right"></i></a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">No recent activity</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

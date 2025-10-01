@@ -77,7 +77,7 @@ def create_tables_postgres(schema, config):
     conn = psycopg2.connect(
         dbname="TestDB",
         user="postgres",
-        password="Password",
+        password="pass",
         host="localhost",
         port="5432")
     cur = conn.cursor()

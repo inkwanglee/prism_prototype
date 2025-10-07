@@ -6,10 +6,10 @@ from .forms import DatasetForm
 
 @login_required
 def dataset_list(request):
-    """데이터셋 목록"""
+    """Dataset list."""
     datasets = Dataset.objects.filter(status='active')
     
-    # 필터링
+    # Filtering
     schema_ref = request.GET.get('schema_ref')
     owner = request.GET.get('owner')
     
@@ -28,7 +28,7 @@ def dataset_list(request):
 
 @login_required
 def dataset_detail(request, pk):
-    """데이터셋 상세"""
+    """Dataset detail"""
     dataset = get_object_or_404(Dataset, pk=pk)
     context = {
         'page_title': f'Dataset: {dataset.key}',
@@ -38,7 +38,7 @@ def dataset_detail(request, pk):
 
 @login_required
 def dataset_create(request):
-    """데이터셋 생성"""
+    """Create dataset."""
     if request.method == 'POST':
         form = DatasetForm(request.POST)
         if form.is_valid():

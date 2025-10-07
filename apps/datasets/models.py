@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 
 class Dataset(models.Model):
-    """데이터셋 카탈로그"""
+    """Dataset catalog"""
     STATUS_CHOICES = [
         ('active', 'Active'),
         ('retired', 'Retired'),
@@ -30,7 +30,7 @@ class Dataset(models.Model):
         return f"{self.key} - {self.title}"
 
 class Collar(models.Model):
-    """드릴홀 Collar 데이터"""
+    """Drillhole collar data"""
     dataset = models.ForeignKey(Dataset, on_delete=models.CASCADE, related_name='collars')
     project_id = models.CharField(max_length=64)
     hole_id = models.CharField(max_length=64)
@@ -52,7 +52,7 @@ class Collar(models.Model):
         return f"{self.project_id}/{self.hole_id}"
 
 class Survey(models.Model):
-    """드릴홀 Survey 데이터"""
+    """Drillhole survey data"""
     collar = models.ForeignKey(Collar, on_delete=models.CASCADE, related_name='surveys')
     depth_m = models.FloatField(help_text="Depth in meters")
     dip_deg = models.FloatField(help_text="Dip in degrees (-90 to 90)")

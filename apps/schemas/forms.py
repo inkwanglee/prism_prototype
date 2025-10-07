@@ -38,7 +38,7 @@ class SchemaVersionForm(forms.ModelForm):
         self.helper.form_method = 'post'
         self.helper.add_input(Submit('submit', 'Create Version', css_class='btn btn-primary'))
         
-        # 초기값 설정 (편집 시)
+        # Set initial values (when editing).
         if self.instance and self.instance.pk:
             self.fields['json_schema_text'].initial = json.dumps(
                 self.instance.json_schema, 

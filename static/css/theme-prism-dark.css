@@ -1,0 +1,165 @@
+/* PRISM Dark+Orange Theme */
+:root{
+  --prism-bg:#0c0c0f; --prism-surface:#141418; --prism-surface-2:#1b1b21;
+  --prism-border:#2a2a33; --prism-text:#e8e8ee; --prism-muted:#b6b6c2;
+  --prism-accent:#ff7a1a; --prism-accent-2:#ff9e4d; --prism-accent-3:#cc5f12;
+}
+
+/* Base / Bootstrap variables */
+body{
+  --bs-body-bg:var(--prism-bg);
+  --bs-body-color:var(--prism-text);
+  --bs-border-color:var(--prism-border);
+  --bs-link-color:var(--prism-accent);
+  --bs-link-hover-color:var(--prism-accent-2);
+  background-color:var(--prism-bg)!important; color:var(--prism-text)!important;
+}
+
+/* Navbar */
+.navbar.bg-dark{ background-color:#0b0b0f!important; border-bottom:1px solid var(--prism-border); }
+.navbar .nav-link{ color:var(--prism-muted)!important; }
+.navbar .nav-link:hover{ color:var(--prism-text)!important; }
+.navbar .navbar-brand img{ display:inline-block; vertical-align:middle; border-radius:6px; }
+
+/* Sidebar */
+.sidebar{
+  min-height:100vh; background:var(--prism-surface)!important; border-right:1px solid var(--prism-border)!important;
+}
+.sidebar .nav-link{ color:var(--prism-muted); border-radius:10px; padding:.5rem .75rem; }
+.sidebar .nav-link:hover{ background:var(--prism-surface-2); color:var(--prism-text); }
+.sidebar .nav-link.active{
+  background:linear-gradient(90deg,rgba(255,122,26,.18),rgba(255,122,26,.04));
+  color:var(--prism-text)!important; border:1px solid rgba(255,122,26,.35);
+}
+
+/* Cards, tables, forms, buttons */
+.card{ background:var(--prism-surface); border-color:var(--prism-border); color:var(--prism-text); box-shadow:0 6px 16px rgba(0,0,0,.35); }
+.card .card-header{ background:var(--prism-surface-2); border-bottom:1px solid var(--prism-border); }
+
+.table{ --bs-table-color:var(--prism-text); --bs-table-bg:var(--prism-surface); --bs-table-border-color:var(--prism-border); }
+.table thead th{ background:var(--prism-surface-2); color:var(--prism-muted); border-bottom:1px solid var(--prism-border)!important; }
+
+.btn-primary{ background-color:var(--prism-accent); border-color:var(--prism-accent-3); }
+.btn-primary:hover{ background-color:var(--prism-accent-2); border-color:var(--prism-accent-2); }
+.btn-outline-primary{ color:var(--prism-accent); border-color:var(--prism-accent); }
+.btn-outline-primary:hover{ background:var(--prism-accent); color:#121216; }
+
+.badge-status-draft{ background:#6c757d; }
+.badge-status-approved{ background:#1c8f5d; }
+.badge-status-deprecated{ background:#d94848; }
+
+.form-control,.form-select{ background:var(--prism-surface-2); border-color:var(--prism-border); color:var(--prism-text); }
+.form-control:focus,.form-select:focus{
+  background:var(--prism-surface-2); border-color:var(--prism-accent);
+  box-shadow:0 0 0 .2rem rgba(255,122,26,.25); color:var(--prism-text);
+}
+
+/* === Accessibility/contrast tweaks (dark mode) === */
+
+/* Make "muted" text readable on dark */
+.text-muted,
+.form-text,
+.small,
+.card .text-muted {
+  color: #c8cbd4 !important; /* was too dim */
+}
+
+/* Inputs & selects: brighter text + clearer placeholder */
+.form-control,
+.form-select {
+  color: #eceff6 !important;
+}
+.form-control::placeholder {
+  color: #aeb3c0 !important;
+  opacity: 1;
+}
+
+/* Disabled buttons/inputs: increase contrast slightly */
+.btn:disabled,
+.btn.disabled,
+.disabled > .btn {
+  opacity: .65;          /* not too faint */
+}
+.form-control:disabled,
+.form-select:disabled {
+  color: #bfc5d1;
+  background: #17171c;
+}
+
+/* Secondary/neutral buttons: readable on dark */
+.btn-secondary {
+  background: #2a2f3a;
+  border-color: #3a3f4b;
+  color: #e9ecf4;
+}
+.btn-secondary:hover {
+  background: #343a46;
+  border-color: #4a5060;
+}
+
+/* Dropdowns/menus tooltips etc. */
+.dropdown-menu {
+  background: #1b1b21;
+  border-color: #2a2a33;
+  color: #e8e8ee;
+}
+.dropdown-item { color: #dfe3ec; }
+.dropdown-item:hover { background: #24242c; color: #ffffff; }
+
+/* Tables: slightly brighter body text */
+.table { --bs-table-color: #e7eaf2; }
+
+/* Badges: ensure text pops */
+.badge { color: #111319; }
+.badge.bg-secondary { background: #465062; color: #f2f4f8; }
+
+/* Focus ring: make visible on dark */
+:focus-visible {
+  outline: 2px solid rgba(255,122,26,.65);
+  outline-offset: 2px;
+}
+
+/* Orange info banner for dashboard */
+.alert-prism{
+  background: rgba(255,122,26,.16);
+  border: 1px solid rgba(255,122,26,.38);
+  color: #ffd9bd;
+}
+.alert-prism .alert-heading{
+  color: #ffe6d2;
+}
+.alert-prism hr{
+  border-top: 1px solid rgba(255,122,26,.35);
+}
+
+/* Turn Bootstrap's blue alert-info into our orange accent */
+.alert-info {
+  background: rgba(255,122,26,.16) !important;
+  border: 1px solid rgba(255,122,26,.38) !important;
+  color: #ffd9bd !important;
+}
+.alert-info .alert-heading { color: #ffe6d2 !important; }
+.alert-info hr { border-top: 1px solid rgba(255,122,26,.35) !important; }
+
+/* Make "View all" and other primary links use the orange accent */
+.link-primary,
+.text-primary,
+a.link-primary {
+  color: var(--prism-accent) !important;
+}
+.link-primary:hover,
+.text-primary:hover,
+a.link-primary:hover {
+  color: var(--prism-accent-2) !important;
+  text-decoration: underline;
+}
+
+/* Make dashboard "View all" links orange */
+.card .card-link {
+  color: var(--prism-accent) !important;
+  text-decoration: none;
+}
+.card .card-link:hover {
+  color: var(--prism-accent-2) !important;
+  text-decoration: underline;
+}

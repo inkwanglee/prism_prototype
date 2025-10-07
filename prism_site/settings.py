@@ -43,7 +43,7 @@ INSTALLED_APPS = [
     'apps.lineage',
 ]
 
-# OIDC 활성화 여부에 따라
+# The login method differs depending on whether OIDC is enabled.
 if not env.bool('DISABLE_OIDC', default=False):
     INSTALLED_APPS.append('mozilla_django_oidc')
 

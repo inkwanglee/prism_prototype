@@ -1,11 +1,18 @@
 <!doctype html>
 <html lang="en">
+
 <head>
+    {% load static %}
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}{{ page_title|default:"PRISM" }}{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <!-- Dark + orange theme (served from /static/css/) -->
+    <link href="{% static 'css/theme-prism-dark.css' %}" rel="stylesheet">
+
+    
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <style>
         .sidebar {
@@ -13,22 +20,34 @@
             background-color: #f8f9fa;
             border-right: 1px solid #dee2e6;
         }
+
         .nav-link.active {
             background-color: #0d6efd;
             color: white !important;
         }
-        .badge-status-draft { background-color: #6c757d; }
-        .badge-status-approved { background-color: #198754; }
-        .badge-status-deprecated { background-color: #dc3545; }
+
+        .badge-status-draft {
+            background-color: #6c757d;
+        }
+
+        .badge-status-approved {
+            background-color: #198754;
+        }
+
+        .badge-status-deprecated {
+            background-color: #dc3545;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
+
 <body>
     <!-- Top Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="{% url 'core:home' %}">
-                <i class="bi bi-layers"></i> PRISM
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="{% url 'core:home' %}">
+                <img src="{% static 'img/prism-mark.png' %}" width="28" height="28" class="me-2" alt="PRISM logo">
+                <span>PRISM</span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -37,12 +56,15 @@
                 <ul class="navbar-nav ms-auto">
                     {% if user.is_authenticated %}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                            data-bs-toggle="dropdown">
                             <i class="bi bi-person-circle"></i> {{ user.username }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="{% url 'core:settings' %}">Settings</a></li>
-                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
                             <li><a class="dropdown-item" href="{% url 'admin:logout' %}">Logout</a></li>
                         </ul>
                     </li>
@@ -63,32 +85,38 @@
                 <div class="position-sticky">
                     <ul class="nav flex-column">
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.app_name == 'core' and request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'core:home' %}">
+                            <a class="nav-link {% if request.resolver_match.app_name == 'core' and request.resolver_match.url_name == 'home' %}active{% endif %}"
+                                href="{% url 'core:home' %}">
                                 <i class="bi bi-house-door"></i> Dashboard
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.app_name == 'schemas' %}active{% endif %}" href="{% url 'schemas:list' %}">
+                            <a class="nav-link {% if request.resolver_match.app_name == 'schemas' %}active{% endif %}"
+                                href="{% url 'schemas:list' %}">
                                 <i class="bi bi-file-code"></i> Schemas
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.app_name == 'datasets' %}active{% endif %}" href="{% url 'datasets:list' %}">
+                            <a class="nav-link {% if request.resolver_match.app_name == 'datasets' %}active{% endif %}"
+                                href="{% url 'datasets:list' %}">
                                 <i class="bi bi-database"></i> Datasets
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.app_name == 'ingestion' %}active{% endif %}" href="{% url 'ingestion:list' %}">
+                            <a class="nav-link {% if request.resolver_match.app_name == 'ingestion' %}active{% endif %}"
+                                href="{% url 'ingestion:list' %}">
                                 <i class="bi bi-cloud-upload"></i> Ingestion
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.app_name == 'qaqc' %}active{% endif %}" href="{% url 'qaqc:dashboard' %}">
+                            <a class="nav-link {% if request.resolver_match.app_name == 'qaqc' %}active{% endif %}"
+                                href="{% url 'qaqc:dashboard' %}">
                                 <i class="bi bi-check2-circle"></i> QAQC
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.app_name == 'lineage' %}active{% endif %}" href="{% url 'lineage:view' %}">
+                            <a class="nav-link {% if request.resolver_match.app_name == 'lineage' %}active{% endif %}"
+                                href="{% url 'lineage:view' %}">
                                 <i class="bi bi-diagram-3"></i> Lineage
                             </a>
                         </li>
@@ -140,4 +168,5 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     {% block extra_js %}{% endblock %}
 </body>
+
 </html>

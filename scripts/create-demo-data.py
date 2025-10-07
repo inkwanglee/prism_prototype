@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-데모 데이터 생성 스크립트
+Demo data creation script
 """
 import os
 import django
@@ -19,7 +19,7 @@ from apps.lineage.models import Snapshot
 def create_demo_data():
     print("Creating demo data...")
     
-    # 사용자 생성
+    # Create user.
     user, created = User.objects.get_or_create(
         username='demo_user',
         defaults={'email': 'demo@example.com'}
@@ -29,7 +29,7 @@ def create_demo_data():
         user.save()
         print(f"Created user: {user.username}")
     
-    # 스키마 생성
+    # Create schema.
     schema, created = Schema.objects.get_or_create(
         key='drillhole.collar',
         defaults={
@@ -41,7 +41,7 @@ def create_demo_data():
     if created:
         print(f"Created schema: {schema.key}")
         
-        # 스키마 버전 생성
+        # Create schema version.
         json_schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
@@ -66,7 +66,7 @@ def create_demo_data():
         )
         print(f"Created schema version: {version.version}")
     
-    # 데이터셋 생성
+    # Create dataset.
     dataset, created = Dataset.objects.get_or_create(
         key='exploration.drillholes',
         defaults={
@@ -82,7 +82,7 @@ def create_demo_data():
     if created:
         print(f"Created dataset: {dataset.key}")
     
-    # Ingestion Run 생성
+    # Create ingestion run.
     run, created = IngestionRun.objects.get_or_create(
         source='ALS_Lab',
         defaults={
@@ -97,7 +97,7 @@ def create_demo_data():
     if created:
         print(f"Created ingestion run: {run.id}")
     
-    # QAQC Run 생성
+    # Create QAQC run.
     qaqc, created = QaqcRun.objects.get_or_create(
         batch_id='BATCH-001',
         defaults={
@@ -110,7 +110,7 @@ def create_demo_data():
     if created:
         print(f"Created QAQC run: {qaqc.batch_id}")
     
-    # Snapshot 생성
+    # Create snapshot
     snapshot, created = Snapshot.objects.get_or_create(
         snapshot_id='snap-20250101-001',
         defaults={

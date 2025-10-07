@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 
 class AuditLog(models.Model):
-    """감사 로그 - 모든 중요한 변경사항 기록"""
+    """Audit log — record all important changes."""
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     action = models.CharField(max_length=64)  # create, update, delete, approve, etc.
     model_name = models.CharField(max_length=128)

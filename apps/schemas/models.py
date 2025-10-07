@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 
 class Schema(models.Model):
-    """스키마 레지스트리 - 데이터 스키마 정의"""
+    """Schema registry - defines data schemas"""
     key = models.CharField(max_length=200, unique=True, help_text="e.g., drillhole.collar")
     owner = models.CharField(max_length=200)
     description = models.TextField(blank=True)
@@ -17,11 +17,11 @@ class Schema(models.Model):
         return self.key
     
     def get_latest_approved_version(self):
-        """최신 승인된 버전 반환"""
+        """Return the latest approved version"""
         return self.versions.filter(status='approved').order_by('-created_at').first()
 
 class SchemaVersion(models.Model):
-    """스키마 버전 - 각 스키마의 버전별 정의"""
+    """Schema version - definition of each version of a schema"""
     STATUS_CHOICES = [
         ('draft', 'Draft'),
         ('approved', 'Approved'),
@@ -54,5 +54,5 @@ class SchemaVersion(models.Model):
     
     @property
     def schema_ref(self):
-        """스키마 참조 문자열"""
+        """Schema reference string"""
         return f"{self.schema.key}@{self.version}"

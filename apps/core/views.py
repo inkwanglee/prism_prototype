@@ -4,16 +4,16 @@ from django.db import connection
 from django.contrib.auth.decorators import login_required
 
 def home(request):
-    """홈 페이지"""
+    """Home page"""
     context = {
         'page_title': 'PRISM Dashboard',
     }
     return render(request, 'core/home.html', context)
 
 def health(request):
-    """헬스 체크 엔드포인트"""
+    """Health check endpoint."""
     try:
-        # DB 연결 확인
+        # Check DB connection.
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
         
@@ -29,7 +29,7 @@ def health(request):
 
 @login_required
 def settings_view(request):
-    """설정 페이지"""
+    """Settings page."""
     context = {
         'page_title': 'Settings',
         'user_roles': getattr(request.user, 'prism_roles', []),

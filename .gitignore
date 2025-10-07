@@ -21,6 +21,8 @@ wheels/
 *.egg
 MANIFEST
 
+celerybeat-schedule
+
 # Django
 *.log
 local_settings.py

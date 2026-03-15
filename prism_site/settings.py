@@ -9,6 +9,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, '.env.dev'))
 
+# Variable
+DISABLE_OIDC = env.bool('DISABLE_OIDC', default=False)
+
 SECRET_KEY = env('DJANGO_SECRET_KEY')
 DEBUG = env.bool('DJANGO_DEBUG', default=True)
 ALLOWED_HOSTS = ['*']
@@ -25,7 +28,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.gis',
+#    'django.contrib.gis',
     
     # Third party
     'rest_framework',
@@ -60,6 +63,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.core.middleware.IdleTimeoutMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_prometheus.middleware.PrometheusAfterMiddleware',
@@ -166,7 +170,7 @@ if not env.bool('DISABLE_OIDC', default=False):
         'mozilla_django_oidc.auth.OIDCAuthenticationBackend',
     )
     
-    LOGIN_URL = '/oidc/authenticate/'
+    LOGIN_URL = '/accounts/login/'
     LOGIN_REDIRECT_URL = '/'
     LOGOUT_REDIRECT_URL = '/'
     
@@ -220,3 +224,23 @@ LOGGING = {
         },
     },
 }
+
+#timeout
+SESSION_IDLE_TIMEOUT = 60  # 1 minutes for testing
+SESSION_COOKIE_AGE = SESSION_IDLE_TIMEOUT
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+#Test
+if env.bool("USE_SQLITE", default=False):
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+else:
+    DATABASES = {
+        'default': env.db('DATABASE_URL')
+    }
+

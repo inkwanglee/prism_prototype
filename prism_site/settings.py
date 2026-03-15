@@ -13,6 +13,10 @@ SECRET_KEY = env('DJANGO_SECRET_KEY')
 DEBUG = env.bool('DJANGO_DEBUG', default=True)
 ALLOWED_HOSTS = ['*']
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://prism-web.kindground-d178727f.australiaeast.azurecontainerapps.io",
+]
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',

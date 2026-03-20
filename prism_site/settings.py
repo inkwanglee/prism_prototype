@@ -50,8 +50,8 @@ INSTALLED_APPS = [
     'apps.lineage',
 ]
 
-# The login method differs depending on whether OIDC is enabled.
-if not env.bool('DISABLE_OIDC', default=False):
+# Add OIDC app when SSO is enabled
+if not DISABLE_OIDC:
     INSTALLED_APPS.append('mozilla_django_oidc')
 
 MIDDLEWARE = [
@@ -63,6 +63,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.accounts.middleware.OIDCClaimsMiddleware',
     'apps.core.middleware.IdleTimeoutMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -163,21 +164,39 @@ SPECTACULAR_SETTINGS = {
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 
-# OIDC Configuration
-if not env.bool('DISABLE_OIDC', default=False):
+# ============================================================
+# OIDC Configuration (SSO)
+# ============================================================
+if not DISABLE_OIDC:
     AUTHENTICATION_BACKENDS = (
         'django.contrib.auth.backends.ModelBackend',
-        'mozilla_django_oidc.auth.OIDCAuthenticationBackend',
+        'apps.accounts.backends.PrismOIDCBackend',
     )
-    
+
     LOGIN_URL = '/accounts/login/'
     LOGIN_REDIRECT_URL = '/'
     LOGOUT_REDIRECT_URL = '/'
-    
+
     OIDC_RP_CLIENT_ID = env('OIDC_CLIENT_ID')
     OIDC_RP_CLIENT_SECRET = env('OIDC_CLIENT_SECRET')
-    OIDC_OP_DISCOVERY_ENDPOINT = f'{env("OIDC_ISSUER")}/.well-known/openid-configuration'
+    OIDC_RP_SIGN_ALGO = 'RS256'
     OIDC_RP_SCOPES = 'openid profile email'
+
+    _OIDC_ISSUER = env('OIDC_ISSUER')
+    OIDC_OP_AUTHORIZATION_ENDPOINT = f'{_OIDC_ISSUER}/protocol/openid-connect/auth'
+    OIDC_OP_TOKEN_ENDPOINT = f'{_OIDC_ISSUER}/protocol/openid-connect/token'
+    OIDC_OP_USER_ENDPOINT = f'{_OIDC_ISSUER}/protocol/openid-connect/userinfo'
+    OIDC_OP_JWKS_ENDPOINT = f'{_OIDC_ISSUER}/protocol/openid-connect/certs'
+    OIDC_OP_LOGOUT_ENDPOINT = f'{_OIDC_ISSUER}/protocol/openid-connect/logout'
+
+    OIDC_STORE_ACCESS_TOKEN = True
+    OIDC_STORE_ID_TOKEN = True
+
+    OIDC_OP_LOGOUT_URL_METHOD = 'apps.accounts.backends.provider_logout_url'
+
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = not DEBUG
+
 else:
     LOGIN_URL = '/admin/login/'
     LOGIN_REDIRECT_URL = '/'
@@ -225,13 +244,13 @@ LOGGING = {
     },
 }
 
-#timeout
-SESSION_IDLE_TIMEOUT = 60  # 1 minutes for testing
+# Session timeout
+SESSION_IDLE_TIMEOUT = 60
 SESSION_COOKIE_AGE = SESSION_IDLE_TIMEOUT
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
-#Test
+# Database override for SQLite testing
 if env.bool("USE_SQLITE", default=False):
     DATABASES = {
         "default": {
@@ -239,8 +258,3 @@ if env.bool("USE_SQLITE", default=False):
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
-else:
-    DATABASES = {
-        'default': env.db('DATABASE_URL')
-    }
-

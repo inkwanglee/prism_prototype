@@ -28,8 +28,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-#    'django.contrib.gis',
-    
+
     # Third party
     'rest_framework',
     'drf_spectacular',
@@ -39,7 +38,7 @@ INSTALLED_APPS = [
     'crispy_forms',
     'crispy_bootstrap5',
     'django_filters',
-    
+
     # Local apps
     'apps.core',
     'apps.accounts',
@@ -182,12 +181,21 @@ if not DISABLE_OIDC:
     OIDC_RP_SIGN_ALGO = 'RS256'
     OIDC_RP_SCOPES = 'openid profile email'
 
+    # Browser-facing URL (user's browser redirects here)
     _OIDC_ISSUER = env('OIDC_ISSUER')
+    # Server-side URL (Django container talks to Keycloak internally)
+    # In Docker: http://keycloak:8080/realms/prism
+    # Local dev: same as OIDC_ISSUER (http://localhost:8080/realms/prism)
+    _OIDC_ISSUER_INTERNAL = env('OIDC_ISSUER_INTERNAL', default=_OIDC_ISSUER)
+
+    # Browser redirect (uses localhost so user's browser can reach it)
     OIDC_OP_AUTHORIZATION_ENDPOINT = f'{_OIDC_ISSUER}/protocol/openid-connect/auth'
-    OIDC_OP_TOKEN_ENDPOINT = f'{_OIDC_ISSUER}/protocol/openid-connect/token'
-    OIDC_OP_USER_ENDPOINT = f'{_OIDC_ISSUER}/protocol/openid-connect/userinfo'
-    OIDC_OP_JWKS_ENDPOINT = f'{_OIDC_ISSUER}/protocol/openid-connect/certs'
     OIDC_OP_LOGOUT_ENDPOINT = f'{_OIDC_ISSUER}/protocol/openid-connect/logout'
+
+    # Server-to-server calls (uses Docker internal hostname when in Docker)
+    OIDC_OP_TOKEN_ENDPOINT = f'{_OIDC_ISSUER_INTERNAL}/protocol/openid-connect/token'
+    OIDC_OP_USER_ENDPOINT = f'{_OIDC_ISSUER_INTERNAL}/protocol/openid-connect/userinfo'
+    OIDC_OP_JWKS_ENDPOINT = f'{_OIDC_ISSUER_INTERNAL}/protocol/openid-connect/certs'
 
     OIDC_STORE_ACCESS_TOKEN = True
     OIDC_STORE_ID_TOKEN = True
@@ -245,7 +253,7 @@ LOGGING = {
 }
 
 # Session timeout
-SESSION_IDLE_TIMEOUT = 60
+SESSION_IDLE_TIMEOUT = 1800  # 30 minutes
 SESSION_COOKIE_AGE = SESSION_IDLE_TIMEOUT
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False

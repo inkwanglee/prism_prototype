@@ -1,0 +1,144 @@
+{
+  "realm": "prism",
+  "enabled": true,
+  "displayName": "PRISM",
+  "displayNameHtml": "<strong>PRISM</strong>",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "roles": {
+    "realm": [
+      { "name": "geodesK_user", "description": "Any signed-in user coming from GeoDesk SSO" },
+      { "name": "data_steward", "description": "Owns schemas, approvals, and promotion gates" },
+      { "name": "data_engineer", "description": "Builds ingestion and validation" },
+      { "name": "exploration_geologist", "description": "Inputs field data and reviews QAQC" },
+      { "name": "lab_integration_engineer", "description": "Connects lab feeds" },
+      { "name": "platform_sre", "description": "Observability, performance, backups" },
+      { "name": "security_admin", "description": "Roles, policies, audits" }
+    ]
+  },
+  "users": [
+    {
+      "username": "geodeskuser",
+      "email": "geodeskuser@prism.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Alex",
+      "lastName": "GeoDesk",
+      "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
+      "realmRoles": ["geodesK_user"]
+    },
+    {
+      "username": "steward",
+      "email": "steward@prism.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Sarah",
+      "lastName": "Steward",
+      "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
+      "realmRoles": ["data_steward"]
+    },
+    {
+      "username": "engineer",
+      "email": "engineer@prism.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "David",
+      "lastName": "Engineer",
+      "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
+      "realmRoles": ["data_engineer"]
+    },
+    {
+      "username": "geologist1",
+      "email": "geologist1@prism.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Jane",
+      "lastName": "Doe",
+      "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
+      "realmRoles": ["exploration_geologist"]
+    },
+    {
+      "username": "labeng",
+      "email": "labeng@prism.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Mike",
+      "lastName": "Lab",
+      "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
+      "realmRoles": ["lab_integration_engineer"]
+    },
+    {
+      "username": "sre",
+      "email": "sre@prism.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Chris",
+      "lastName": "Ops",
+      "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
+      "realmRoles": ["platform_sre"]
+    },
+    {
+      "username": "secadmin",
+      "email": "secadmin@prism.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Pat",
+      "lastName": "Security",
+      "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
+      "realmRoles": ["security_admin"]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "prism-web",
+      "name": "PRISM Web Application",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "prism-dev-secret-2025",
+      "redirectUris": [
+        "http://localhost:8000/oidc/callback/",
+        "http://localhost:8000/*",
+        "https://prism-web.kindground-d178727f.australiaeast.azurecontainerapps.io/*"
+      ],
+      "webOrigins": [
+        "http://localhost:8000",
+        "https://prism-web.kindground-d178727f.australiaeast.azurecontainerapps.io"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "prism_roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "prism_roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "scopeMappings": [
+    {
+      "client": "prism-web",
+      "roles": [
+        "geodesK_user", "data_steward", "data_engineer",
+        "exploration_geologist", "lab_integration_engineer",
+        "platform_sre", "security_admin"
+      ]
+    }
+  ]
+}

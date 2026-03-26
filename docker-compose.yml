@@ -1,17 +1,23 @@
 services:
   web:
-    build: .
-    command: bash -c "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn prism_site.wsgi:application --bind 0.0.0.0:8000 --reload"
+    build:
+      context: .
+      dockerfile: Dockerfile.web
     ports: 
       - "8000:8000"
     env_file: .env.dev
+    environment:
+      # Inside Docker, server-side calls use internal hostname
+      OIDC_ISSUER_INTERNAL: http://keycloak:8080/realms/prism
     volumes: 
       - .:/app
     depends_on:
-      - db
-      - redis
-      - minio
-      - keycloak
+      keycloak:
+        condition: service_healthy
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
 
   worker:
     build: .
@@ -63,13 +69,26 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
-    command: start-dev
+    command: start-dev --import-realm
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: "8080"
+      KC_HOSTNAME_STRICT_BACKCHANNEL: "false"
     ports: 
       - "8080:8080"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./keycloak/prism-realm.json:/opt/keycloak/data/import/prism-realm.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
 
 volumes:
   postgres_data:
   minio_data:
+  keycloak_data:

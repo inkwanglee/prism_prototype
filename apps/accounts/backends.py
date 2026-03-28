@@ -1,4 +1,6 @@
 import logging
+from urllib.parse import quote
+
 from django.conf import settings
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 
@@ -64,11 +66,24 @@ class PrismOIDCBackend(OIDCAuthenticationBackend):
 def provider_logout_url(request):
     """Build Keycloak RP-Initiated Logout URL."""
     logout_endpoint = getattr(settings, 'OIDC_OP_LOGOUT_ENDPOINT', '')
-    redirect_url = request.build_absolute_uri(settings.LOGOUT_REDIRECT_URL)
+    next_url = request.GET.get('next', '/')
+    expired = request.GET.get('expired') == '1'
+
+    login_redirect_path = f"/accounts/login/?next={quote(next_url, safe='/')}"
+    if expired:
+        login_redirect_path += "&expired=1"
+
+    redirect_url = request.build_absolute_uri(login_redirect_path)
+    id_token = request.session.get('oidc_id_token')
+
     if logout_endpoint:
-        return (
+        url = (
             f"{logout_endpoint}"
             f"?client_id={settings.OIDC_RP_CLIENT_ID}"
-            f"&post_logout_redirect_uri={redirect_url}"
+            f"&post_logout_redirect_uri={quote(redirect_url, safe=':/?=')}"
         )
+        if id_token:
+            url += f"&id_token_hint={quote(id_token, safe='._-')}"
+        return url
+
     return redirect_url

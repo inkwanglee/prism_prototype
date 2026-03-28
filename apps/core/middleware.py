@@ -1,6 +1,6 @@
 from django.conf import settings
-from django.contrib import auth
 from django.shortcuts import redirect
+from django.urls import reverse
 from django.utils import timezone
 
 
@@ -14,20 +14,30 @@ class IdleTimeoutMiddleware:
         self.timeout_seconds = getattr(settings, "SESSION_IDLE_TIMEOUT", 30 * 60)
 
     def __call__(self, request):
+        print("IDLE MIDDLEWARE HIT:", request.path, request.user.is_authenticated)
+
+        path = request.path
+
+        if path.startswith('/accounts/') or path.startswith('/oidc/'):
+            return self.get_response(request)
+
         if request.user.is_authenticated:
             now_ts = int(timezone.now().timestamp())
             last_activity_ts = request.session.get("last_activity_ts")
 
             if last_activity_ts is not None:
                 idle_for = now_ts - last_activity_ts
+
+                print("IDLE CHECK:",
+                      "path=", request.path,
+                      "idle_for=", idle_for,
+                      "timeout=", self.timeout_seconds)
+
                 if idle_for > self.timeout_seconds:
-                    auth.logout(request)
-                    request.session.flush()
-
-                    request.session["session_expired"] = True
-
-                    login_url = settings.LOGIN_URL
-                    return redirect(f"{login_url}?next={request.path}")
+                    logout_url = reverse("accounts:logout")
+                    target = f"{logout_url}?expired=1&next={request.path}"
+                    print("IDLE TIMEOUT redirecting to:", target)
+                    return redirect(f"{logout_url}?expired=1&next={request.path}")
 
             request.session["last_activity_ts"] = now_ts
 

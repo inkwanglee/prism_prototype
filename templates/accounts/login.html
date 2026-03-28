@@ -45,6 +45,13 @@
                     </p>
                 </div>
 
+                {% if session_expired %}
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    Your session expired due to inactivity. Please sign in again.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endif %}
+
                 {% if messages %}
                 {% for message in messages %}
                 <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
@@ -55,8 +62,8 @@
                 {% endif %}
 
                 <div class="d-grid gap-2">
-                    <a href="{% url 'accounts:login_start' %}?next={{ next|urlencode }}"
-                       class="btn btn-sso btn-lg">
+                    <a href="{% url 'accounts:login_start' %}?next={{ next|urlencode }}{% if session_expired %}&reauth=1{% endif %}"
+                        class="btn btn-sso btn-lg">
                         <i class="bi bi-shield-lock me-2"></i>
                         Sign in with SSO
                     </a>

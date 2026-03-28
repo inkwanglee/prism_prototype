@@ -10,44 +10,15 @@ DB_CONFIG = {
     "host": "localhost",
     "port": "5432"
 }
+schema = {}
 
-# JSON schema structure
-schema_json = '''
-{
-  "Location": {
-    "location_id": "int (pk)",
-    "latitude": "float",
-    "longitude": "float",
-    "location_name": "string",
-    "location_notes": "string"
-  },
-  "DrillHole": {
-    "drillhole_id": "int (pk)",
-    "drillhole_latitude": "float",
-    "drillhole_longitude": "float",
-    "location_id": "int (fk to Location.location_id)"
-  },
-  "RockType": {
-    "rock_type_id": "int (pk)",
-    "rock_type": "string"
-  },
-  "Sample": {
-    "sample_id": "int (pk)",
-    "sample_of_note": "bool",
-    "sample_weight": "float",
-    "sample_split_weight": "float",
-    "sample_excess_weight": "float",
-    "sample_depth": "int",
-    "sample_gold_contents": "float",
-    "sample_iron_contents": "float",
-    "sample_copper_contents": "float",
-    "sample_notes": "string",
-    "drillhole_id": "int (fk to DrillHole.drillhole_id)",
-    "ground_conditions": "string",
-    "rock_type_id": "int (fk to RockType.rock_type_id)"
-  }
-}
-'''
+def load_schema_from_file():
+
+    with open(Schema.json, "r", encoding="utf-8") as file:
+        schema = json.load(file)
+
+    return schema
+
 
 # Map to PostgreSQL data types
 TYPE_MAP = {

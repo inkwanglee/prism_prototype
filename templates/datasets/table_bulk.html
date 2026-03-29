@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block page_actions %}
+<a href="{% url 'datasets:table_view' app_label model_name %}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Back to Table
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Bulk Add — {{ model_verbose }}</h5>
+            </div>
+            <div class="card-body">
+                <p>Upload a CSV file to add multiple entries at once. The CSV must contain a header row with the column names listed below.</p>
+
+                <div class="alert alert-info">
+                    <strong>Expected CSV columns:</strong><br>
+                    <code>{{ expected_headers|join:", " }}</code>
+                </div>
+
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="csv_file" class="form-label">CSV File</label>
+                        <input type="file" name="csv_file" id="csv_file" class="form-control" accept=".csv" required>
+                        <div class="form-text">Max file size depends on server configuration. Each row will be validated before insertion.</div>
+                    </div>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-cloud-upload"></i> Upload &amp; Import
+                    </button>
+                    <a href="{% url 'datasets:table_view' app_label model_name %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

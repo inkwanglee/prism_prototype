@@ -3,244 +3,388 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.apps import apps
 from django import forms
+from django.conf import settings
+from django.db import connection, transaction
 import csv
 import io
+import json
+import os
+import re
+
+SCHEMA_FILE = os.path.join(settings.BASE_DIR, 'Schema.json')
+IDENTIFIER_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-PROJECT_APP_LABELS = {'core', 'accounts', 'schemas', 'datasets', 'ingestion', 'qaqc', 'lineage'}
-
-
-def _get_project_models():
-    """Return all concrete Django models belonging to the project's apps."""
-    result = []
-    for model in apps.get_models():
-        if model._meta.app_label in PROJECT_APP_LABELS:
-            result.append(model)
-    return sorted(result, key=lambda m: (m._meta.app_label, m._meta.model_name))
+def _load_schema():
+    if not os.path.exists(SCHEMA_FILE):
+        return {}
+    with open(SCHEMA_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 
-def _resolve_model(app_label, model_name):
-    """Safely resolve a model from app_label + model_name."""
+def _is_safe_identifier(name):
+    return bool(IDENTIFIER_RE.match(name))
+
+
+def _quote_ident(name):
+    if not _is_safe_identifier(name):
+        raise ValueError(f'Unsafe identifier: {name}')
+    return f'"{name}"'
+
+
+def _table_exists(table_name):
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = %s
+            )
+            """,
+            [table_name],
+        )
+        return cur.fetchone()[0]
+
+
+def _parse_base_type(type_str):
+    return type_str.split('(')[0].split()[0].strip().lower()
+
+
+def _pk_field(fields):
+    for field_name, type_str in fields.items():
+        if '(pk)' in type_str:
+            return field_name
+    return None
+
+
+def _build_input_meta(field_name, type_str):
+    base_type = _parse_base_type(type_str)
+
+    meta = {
+        'name': field_name,
+        'type_str': type_str,
+        'base_type': base_type,
+        'is_pk': '(pk)' in type_str,
+        'is_fk': '(fk)' in type_str,
+        'required': '(pk)' in type_str,
+        'input_type': 'text',
+        'step': None,
+    }
+
+    if base_type == 'int':
+        meta['input_type'] = 'number'
+        meta['step'] = '1'
+    elif base_type == 'float':
+        meta['input_type'] = 'number'
+        meta['step'] = 'any'
+    elif base_type == 'date':
+        meta['input_type'] = 'date'
+    elif base_type == 'bool':
+        meta['input_type'] = 'checkbox'
+
+    return meta
+
+
+def _coerce_value(raw_value, type_str, from_csv=False):
+    base_type = _parse_base_type(type_str)
+
+    if base_type == 'bool':
+        if from_csv:
+            if raw_value in (None, ''):
+                return False
+            return str(raw_value).strip().lower() in ('1', 'true', 'yes', 'y', 'on')
+        return raw_value in ('on', 'true', 'True', '1')
+
+    if raw_value is None or raw_value == '':
+        return None
+
+    if base_type == 'int':
+        return int(raw_value)
+    if base_type == 'float':
+        return float(raw_value)
+    if base_type == 'date':
+        return raw_value
+
+    return raw_value
+
+
+def _get_table_count(table_name):
     try:
-        model = apps.get_model(app_label, model_name)
-    except LookupError:
-        return None
-    if model._meta.app_label not in PROJECT_APP_LABELS:
-        return None
-    return model
+        with connection.cursor() as cur:
+            cur.execute(f'SELECT COUNT(*) FROM {_quote_ident(table_name)}')
+            return cur.fetchone()[0]
+    except Exception:
+        return '—'
 
 
-def _build_model_form(model):
-    """Dynamically build a ModelForm for any model."""
-    excluded = []
-    for field in model._meta.get_fields():
-        if not hasattr(field, 'column'):
+def _get_table_columns(table_name):
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = %s
+            ORDER BY ordinal_position
+            """,
+            [table_name],
+        )
+        return [row[0] for row in cur.fetchall()]
+
+
+def _insert_row(table_name, table_fields, incoming_data, from_csv=False):
+    columns = []
+    values = []
+    errors = []
+
+    for field_name, type_str in table_fields.items():
+        if _parse_base_type(type_str) == 'bool':
+            raw_value = incoming_data.get(field_name)
+        else:
+            raw_value = incoming_data.get(field_name, '')
+            if raw_value is not None:
+                raw_value = str(raw_value).strip()
+
+        if '(pk)' in type_str and (raw_value is None or raw_value == ''):
+            errors.append(f'{field_name} is required.')
             continue
-        if getattr(field, 'auto_now', False) or getattr(field, 'auto_now_add', False):
-            excluded.append(field.name)
-        if field.primary_key and not getattr(field, 'editable', True):
-            excluded.append(field.name)
 
-    class DynForm(forms.ModelForm):
-        class Meta:
-            _model = model
-            fields = '__all__'
-            exclude = excluded
-
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            for name, f in self.fields.items():
-                f.widget.attrs.setdefault('class', 'form-control')
-                if isinstance(f.widget, forms.Select):
-                    f.widget.attrs['class'] = 'form-select'
-                if isinstance(f.widget, forms.CheckboxInput):
-                    f.widget.attrs['class'] = 'form-check-input'
-
-    DynForm.Meta.model = model
-    return DynForm
-
-
-def _get_editable_fields(model):
-    """Return field objects that are user-editable (for CSV headers etc.)."""
-    fields = []
-    for field in model._meta.get_fields():
-        if not hasattr(field, 'column'):
+        try:
+            coerced = _coerce_value(raw_value, type_str, from_csv=from_csv)
+        except (ValueError, TypeError):
+            errors.append(f'{field_name} must be a valid {_parse_base_type(type_str)}.')
             continue
-        if field.primary_key and not getattr(field, 'editable', True):
-            continue
-        if getattr(field, 'auto_now', False) or getattr(field, 'auto_now_add', False):
-            continue
-        fields.append(field)
-    return fields
 
+        columns.append(field_name)
+        values.append(coerced)
 
-# ---------------------------------------------------------------------------
-# Views
-# ---------------------------------------------------------------------------
+    if errors:
+        return False, errors
+
+    quoted_table = _quote_ident(table_name)
+    quoted_columns = ', '.join(_quote_ident(col) for col in columns)
+    placeholders = ', '.join(['%s'] * len(values))
+
+    sql = f'INSERT INTO {quoted_table} ({quoted_columns}) VALUES ({placeholders})'
+
+    with connection.cursor() as cur:
+        cur.execute(sql, values)
+
+    return True, []
+
 
 @login_required
 def table_list(request):
-    """List all database tables from project apps."""
-    models = _get_project_models()
+    schema = _load_schema()
+
     table_info = []
-    for model in models:
-        try:
-            count = model.objects.count()
-        except Exception:
-            count = '—'
+    for table_name, fields in schema.items():
+        exists = _table_exists(table_name)
         table_info.append({
-            'app_label': model._meta.app_label,
-            'model_name': model._meta.model_name,
-            'verbose_name': model._meta.verbose_name.title(),
-            'verbose_name_plural': model._meta.verbose_name_plural.title(),
-            'db_table': model._meta.db_table,
-            'row_count': count,
-            'field_count': len([f for f in model._meta.get_fields() if hasattr(f, 'column')]),
+            'table_name': table_name,
+            'db_table': table_name,
+            'field_count': len(fields),
+            'row_count': _get_table_count(table_name) if exists else 'Not initialized',
+            'exists': exists,
         })
 
-    q = request.GET.get('q', '').strip()
+    q = request.GET.get('q', '').strip().lower()
     if q:
-        table_info = [t for t in table_info if q.lower() in t['db_table'].lower()
-                      or q.lower() in t['verbose_name'].lower()
-                      or q.lower() in t['app_label'].lower()]
+        table_info = [
+            t for t in table_info
+            if q in t['table_name'].lower() or q in t['db_table'].lower()
+        ]
 
     context = {
         'page_title': 'Datasets',
         'tables': table_info,
-        'search_q': q,
+        'search_q': request.GET.get('q', '').strip(),
     }
     return render(request, 'datasets/list.html', context)
 
 
 @login_required
-def table_view(request, app_label, model_name):
-    """View all rows of a table."""
-    model = _resolve_model(app_label, model_name)
-    if model is None:
-        messages.error(request, 'Table not found.')
+def table_view(request, table_name):
+    schema = _load_schema()
+
+    if table_name not in schema:
+        messages.error(request, 'Table not found in Schema.json.')
         return redirect('datasets:list')
 
-    fields = [f for f in model._meta.get_fields() if hasattr(f, 'column')]
-    queryset = model.objects.all()[:500]
+    if not _table_exists(table_name):
+        messages.error(request, f'Table "{table_name}" has not been initialized yet. Go to Schema Registry and click Initialize Database.')
+        return redirect('datasets:list')
 
-    rows = []
-    for obj in queryset:
-        row = []
-        for field in fields:
-            val = getattr(obj, field.attname, '')
-            row.append(val)
-        rows.append({'pk': obj.pk, 'cells': row})
+    try:
+        columns = _get_table_columns(table_name)
+        pk_name = _pk_field(schema[table_name])
 
-    context = {
-        'page_title': f'{model._meta.verbose_name_plural.title()}',
-        'model_meta': model._meta,
-        'app_label': app_label,
-        'model_name': model_name,
-        'fields': fields,
-        'rows': rows,
-        'total_count': model.objects.count(),
-    }
-    return render(request, 'datasets/table_view.html', context)
+        order_sql = f' ORDER BY {_quote_ident(pk_name)}' if pk_name else ''
+        with connection.cursor() as cur:
+            cur.execute(f'SELECT * FROM {_quote_ident(table_name)}{order_sql} LIMIT 500')
+            raw_rows = cur.fetchall()
+
+        rows = []
+        pk_index = columns.index(pk_name) if pk_name in columns else None
+        for row in raw_rows:
+            rows.append({
+                'cells': row,
+                'pk': row[pk_index] if pk_index is not None else None,
+            })
+
+        context = {
+            'page_title': table_name,
+            'table_name': table_name,
+            'fields': columns,
+            'rows': rows,
+            'total_count': _get_table_count(table_name),
+            'pk_name': pk_name,
+        }
+        return render(request, 'datasets/table_view.html', context)
+
+    except Exception as e:
+        messages.error(request, f'Could not load table "{table_name}": {e}')
+        return redirect('datasets:list')
 
 
 @login_required
-def table_add_entry(request, app_label, model_name):
-    """Add a single row to a table."""
-    model = _resolve_model(app_label, model_name)
-    if model is None:
-        messages.error(request, 'Table not found.')
+def table_add_entry(request, table_name):
+    schema = _load_schema()
+
+    if table_name not in schema:
+        messages.error(request, 'Table not found in Schema.json.')
         return redirect('datasets:list')
 
-    FormClass = _build_model_form(model)
+    if not _table_exists(table_name):
+        messages.error(request, f'Table "{table_name}" has not been initialized yet. Go to Schema Registry and click Initialize Database.')
+        return redirect('datasets:list')
+
+    table_fields = schema[table_name]
+    field_meta = [_build_input_meta(field_name, type_str) for field_name, type_str in table_fields.items()]
 
     if request.method == 'POST':
-        form = FormClass(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Entry added to {model._meta.verbose_name_plural}.')
-            return redirect('datasets:table_view', app_label=app_label, model_name=model_name)
-    else:
-        form = FormClass()
+        try:
+            success, errors = _insert_row(table_name, table_fields, request.POST, from_csv=False)
+            if success:
+                messages.success(request, f'Entry added to {table_name}.')
+                return redirect('datasets:table_view', table_name=table_name)
+            for error in errors:
+                messages.error(request, error)
+        except Exception as e:
+            messages.error(request, f'Insert failed: {e}')
 
     context = {
-        'page_title': f'Add {model._meta.verbose_name.title()}',
-        'form': form,
-        'app_label': app_label,
-        'model_name': model_name,
-        'model_verbose': model._meta.verbose_name.title(),
+        'page_title': f'Add Entry — {table_name}',
+        'table_name': table_name,
+        'fields': field_meta,
     }
     return render(request, 'datasets/table_add.html', context)
 
 
 @login_required
-def table_add_bulk(request, app_label, model_name):
-    """Bulk-add rows via CSV upload."""
-    model = _resolve_model(app_label, model_name)
-    if model is None:
-        messages.error(request, 'Table not found.')
+def table_add_bulk(request, table_name):
+    schema = _load_schema()
+
+    if table_name not in schema:
+        messages.error(request, 'Table not found in Schema.json.')
         return redirect('datasets:list')
 
-    editable_fields = _get_editable_fields(model)
-    expected_headers = [f.name for f in editable_fields]
+    if not _table_exists(table_name):
+        messages.error(request, f'Table "{table_name}" has not been initialized yet. Go to Schema Registry and click Initialize Database.')
+        return redirect('datasets:list')
+
+    table_fields = schema[table_name]
+    expected_headers = list(table_fields.keys())
 
     if request.method == 'POST':
         csv_file = request.FILES.get('csv_file')
+
         if not csv_file:
             messages.error(request, 'Please upload a CSV file.')
-        elif not csv_file.name.endswith('.csv'):
+        elif not csv_file.name.lower().endswith('.csv'):
             messages.error(request, 'File must be a .csv file.')
         else:
             try:
-                decoded = csv_file.read().decode('utf-8')
+                decoded = csv_file.read().decode('utf-8-sig')
                 reader = csv.DictReader(io.StringIO(decoded))
+
+                if reader.fieldnames is None:
+                    messages.error(request, 'CSV file must include a header row.')
+                    return redirect('datasets:table_bulk', table_name=table_name)
+
+                csv_headers = [h.strip() for h in reader.fieldnames if h is not None]
+                unknown_headers = [h for h in csv_headers if h not in table_fields]
+                missing_pk_headers = [h for h, t in table_fields.items() if '(pk)' in t and h not in csv_headers]
+
+                if unknown_headers:
+                    messages.error(request, f'Unexpected CSV columns: {", ".join(unknown_headers)}')
+                    return redirect('datasets:table_bulk', table_name=table_name)
+
+                if missing_pk_headers:
+                    messages.error(request, f'CSV is missing required PK column(s): {", ".join(missing_pk_headers)}')
+                    return redirect('datasets:table_bulk', table_name=table_name)
+
                 created = 0
-                errors_count = 0
-                for row in reader:
-                    try:
-                        FormClass = _build_model_form(model)
-                        form = FormClass(row)
-                        if form.is_valid():
-                            form.save()
-                            created += 1
-                        else:
-                            errors_count += 1
-                    except Exception:
-                        errors_count += 1
+                skipped = 0
+
+                with transaction.atomic():
+                    for idx, row in enumerate(reader, start=2):
+                        normalized = {k.strip(): v for k, v in row.items() if k is not None}
+                        try:
+                            success, errors = _insert_row(table_name, table_fields, normalized, from_csv=True)
+                            if success:
+                                created += 1
+                            else:
+                                skipped += 1
+                                messages.warning(request, f'Row {idx} skipped: {"; ".join(errors)}')
+                        except Exception as e:
+                            skipped += 1
+                            messages.warning(request, f'Row {idx} skipped: {e}')
+
                 if created:
-                    messages.success(request, f'{created} entries added successfully.')
-                if errors_count:
-                    messages.warning(request, f'{errors_count} rows had errors and were skipped.')
-                return redirect('datasets:table_view', app_label=app_label, model_name=model_name)
+                    messages.success(request, f'{created} row(s) added to {table_name}.')
+                if skipped:
+                    messages.warning(request, f'{skipped} row(s) were skipped.')
+
+                return redirect('datasets:table_view', table_name=table_name)
+
             except Exception as e:
                 messages.error(request, f'Error processing CSV: {e}')
 
     context = {
-        'page_title': f'Bulk Add — {model._meta.verbose_name_plural.title()}',
-        'app_label': app_label,
-        'model_name': model_name,
-        'model_verbose': model._meta.verbose_name_plural.title(),
+        'page_title': f'Bulk Add — {table_name}',
+        'table_name': table_name,
+        'model_verbose': table_name,
         'expected_headers': expected_headers,
     }
     return render(request, 'datasets/table_bulk.html', context)
 
 
 @login_required
-def table_delete_entry(request, app_label, model_name, pk):
-    """Delete a single row from a table."""
-    model = _resolve_model(app_label, model_name)
-    if model is None:
-        messages.error(request, 'Table not found.')
+def table_delete_entry(request, table_name, pk):
+    schema = _load_schema()
+
+    if table_name not in schema:
+        messages.error(request, 'Table not found in Schema.json.')
         return redirect('datasets:list')
 
-    try:
-        obj = model.objects.get(pk=pk)
-        obj.delete()
-        messages.success(request, f'Entry deleted from {model._meta.verbose_name_plural}.')
-    except model.DoesNotExist:
-        messages.error(request, 'Entry not found.')
+    if not _table_exists(table_name):
+        messages.error(request, f'Table "{table_name}" has not been initialized yet.')
+        return redirect('datasets:list')
 
-    return redirect('datasets:table_view', app_label=app_label, model_name=model_name)
+    pk_name = _pk_field(schema[table_name])
+    if not pk_name:
+        messages.error(request, f'No primary key found for {table_name}.')
+        return redirect('datasets:table_view', table_name=table_name)
+
+    try:
+        with connection.cursor() as cur:
+            cur.execute(
+                f'DELETE FROM {_quote_ident(table_name)} WHERE {_quote_ident(pk_name)} = %s',
+                [pk],
+            )
+        messages.success(request, f'Entry deleted from {table_name}.')
+    except Exception as e:
+        messages.error(request, f'Delete failed: {e}')
+
+    return redirect('datasets:table_view', table_name=table_name)

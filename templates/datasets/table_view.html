@@ -2,10 +2,10 @@
 
 {% block page_actions %}
 <div class="btn-group" role="group">
-    <a href="{% url 'datasets:table_add' app_label model_name %}" class="btn btn-success">
+    <a href="{% url 'datasets:table_add' table_name %}" class="btn btn-success">
         <i class="bi bi-plus-circle"></i> Add Entry
     </a>
-    <a href="{% url 'datasets:table_bulk' app_label model_name %}" class="btn btn-warning">
+    <a href="{% url 'datasets:table_bulk' table_name %}" class="btn btn-warning">
         <i class="bi bi-cloud-upload"></i> Add Bulk
     </a>
     <a href="{% url 'datasets:list' %}" class="btn btn-outline-secondary">
@@ -18,12 +18,14 @@
 <div class="card mb-3">
     <div class="card-body d-flex justify-content-between align-items-center">
         <span>
-            <span class="badge bg-secondary">{{ app_label }}</span>
-            <code class="ms-2">{{ model_meta.db_table }}</code>
+            <span class="badge bg-secondary">Schema Table</span>
+            <code class="ms-2">{{ table_name }}</code>
         </span>
         <span class="text-muted">
             {{ total_count }} total record{{ total_count|pluralize }}
-            {% if total_count > 500 %}<span class="badge bg-warning text-dark ms-2">Showing first 500</span>{% endif %}
+            {% if total_count > 500 %}
+                <span class="badge bg-warning text-dark ms-2">Showing first 500</span>
+            {% endif %}
         </span>
     </div>
 </div>
@@ -36,9 +38,11 @@
                 <thead>
                     <tr>
                         {% for field in fields %}
-                        <th>{{ field.verbose_name|title }}</th>
+                        <th>{{ field }}</th>
                         {% endfor %}
+                        {% if pk_name %}
                         <th class="text-end">Actions</th>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -47,8 +51,9 @@
                         {% for cell in row.cells %}
                         <td>{{ cell }}</td>
                         {% endfor %}
+                        {% if pk_name %}
                         <td class="text-end">
-                            <form method="post" action="{% url 'datasets:table_delete' app_label model_name row.pk %}"
+                            <form method="post" action="{% url 'datasets:table_delete' table_name row.pk %}"
                                   style="display:inline"
                                   onsubmit="return confirm('Delete this entry?');">
                                 {% csrf_token %}
@@ -57,6 +62,7 @@
                                 </button>
                             </form>
                         </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -66,7 +72,7 @@
         <div class="text-center py-5">
             <i class="bi bi-inbox display-1 text-muted"></i>
             <p class="mt-3 text-muted">This table is empty.</p>
-            <a href="{% url 'datasets:table_add' app_label model_name %}" class="btn btn-success mt-2">
+            <a href="{% url 'datasets:table_add' table_name %}" class="btn btn-success mt-2">
                 <i class="bi bi-plus-circle"></i> Add Entry
             </a>
         </div>

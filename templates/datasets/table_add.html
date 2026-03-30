@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block page_actions %}
-<a href="{% url 'datasets:table_view' app_label model_name %}" class="btn btn-outline-secondary">
+<a href="{% url 'datasets:table_view' table_name %}" class="btn btn-outline-secondary">
     <i class="bi bi-arrow-left"></i> Back to Table
 </a>
 {% endblock %}
@@ -11,32 +11,58 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">New {{ model_verbose }}</h5>
+                <h5 class="mb-0">New {{ table_name }} Entry</h5>
+                <div class="text-muted small mt-1">
+                    Source: Schema.json | Table: {{ table_name }}
+                </div>
             </div>
             <div class="card-body">
                 <form method="post">
                     {% csrf_token %}
-                    {% for field in form %}
+
+                    {% for field in fields %}
                     <div class="mb-3">
-                        <label for="{{ field.id_for_label }}" class="form-label">
-                            {{ field.label }}
-                            {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                        <label for="{{ field.name }}" class="form-label">
+                            {{ field.name }}
+                            {% if field.required %}
+                                <span class="text-danger">*</span>
+                            {% endif %}
+                            {% if field.is_pk %}
+                                <span class="badge bg-secondary ms-1">PK</span>
+                            {% endif %}
+                            {% if field.is_fk %}
+                                <span class="badge bg-info text-dark ms-1">FK</span>
+                            {% endif %}
                         </label>
-                        {{ field }}
-                        {% if field.help_text %}
-                        <div class="form-text">{{ field.help_text }}</div>
+
+                        {% if field.input_type == 'checkbox' %}
+                            <div class="form-check">
+                                <input
+                                    type="checkbox"
+                                    id="{{ field.name }}"
+                                    name="{{ field.name }}"
+                                    class="form-check-input"
+                                >
+                            </div>
+                        {% else %}
+                            <input
+                                type="{{ field.input_type }}"
+                                id="{{ field.name }}"
+                                name="{{ field.name }}"
+                                class="form-control"
+                                {% if field.step %}step="{{ field.step }}"{% endif %}
+                                {% if field.required %}required{% endif %}
+                            >
                         {% endif %}
-                        {% if field.errors %}
-                        <div class="invalid-feedback d-block">
-                            {% for error in field.errors %}{{ error }}{% endfor %}
-                        </div>
-                        {% endif %}
+
+                        <div class="form-text">{{ field.type_str }}</div>
                     </div>
                     {% endfor %}
+
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-check-circle"></i> Save Entry
                     </button>
-                    <a href="{% url 'datasets:table_view' app_label model_name %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+                    <a href="{% url 'datasets:table_view' table_name %}" class="btn btn-outline-secondary ms-2">Cancel</a>
                 </form>
             </div>
         </div>

@@ -296,40 +296,31 @@ def table_add_bulk(request, table_name):
     table_fields = schema[table_name]
     expected_headers = list(table_fields.keys())
 
+    # Build field metadata for the JS-driven editable table
+    fields_meta = []
+    for field_name, type_str in table_fields.items():
+        fields_meta.append(_build_input_meta(field_name, type_str))
+
     if request.method == 'POST':
-        csv_file = request.FILES.get('csv_file')
-
-        if not csv_file:
-            messages.error(request, 'Please upload a CSV file.')
-        elif not csv_file.name.lower().endswith('.csv'):
-            messages.error(request, 'File must be a .csv file.')
-        else:
+        # Handle JSON submission from the editable table
+        bulk_data_raw = request.POST.get('bulk_data')
+        if bulk_data_raw:
             try:
-                decoded = csv_file.read().decode('utf-8-sig')
-                reader = csv.DictReader(io.StringIO(decoded))
-
-                if reader.fieldnames is None:
-                    messages.error(request, 'CSV file must include a header row.')
-                    return redirect('datasets:table_bulk', table_name=table_name)
-
-                csv_headers = [h.strip() for h in reader.fieldnames if h is not None]
-                unknown_headers = [h for h in csv_headers if h not in table_fields]
-                missing_pk_headers = [h for h, t in table_fields.items() if '(pk)' in t and h not in csv_headers]
-
-                if unknown_headers:
-                    messages.error(request, f'Unexpected CSV columns: {", ".join(unknown_headers)}')
-                    return redirect('datasets:table_bulk', table_name=table_name)
-
-                if missing_pk_headers:
-                    messages.error(request, f'CSV is missing required PK column(s): {", ".join(missing_pk_headers)}')
+                rows_data = json.loads(bulk_data_raw)
+                if not isinstance(rows_data, list):
+                    messages.error(request, 'Invalid data format.')
                     return redirect('datasets:table_bulk', table_name=table_name)
 
                 created = 0
                 skipped = 0
 
                 with transaction.atomic():
-                    for idx, row in enumerate(reader, start=2):
-                        normalized = {k.strip(): v for k, v in row.items() if k is not None}
+                    for idx, row in enumerate(rows_data, start=1):
+                        # Only include known fields
+                        normalized = {}
+                        for field_name in table_fields:
+                            if field_name in row:
+                                normalized[field_name] = row[field_name]
                         try:
                             success, errors = _insert_row(table_name, table_fields, normalized, from_csv=True)
                             if success:
@@ -348,14 +339,17 @@ def table_add_bulk(request, table_name):
 
                 return redirect('datasets:table_view', table_name=table_name)
 
-            except Exception as e:
-                messages.error(request, f'Error processing CSV: {e}')
+            except json.JSONDecodeError:
+                messages.error(request, 'Invalid JSON data.')
+        else:
+            messages.error(request, 'No data submitted.')
 
     context = {
         'page_title': f'Bulk Add — {table_name}',
         'table_name': table_name,
         'model_verbose': table_name,
         'expected_headers': expected_headers,
+        'fields_meta_json': json.dumps(fields_meta),
     }
     return render(request, 'datasets/table_bulk.html', context)
 

@@ -7,37 +7,392 @@
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Bulk Add — {{ model_verbose }}</h5>
-                <div class="text-muted small mt-1">
-                    Source: Schema.json | Table: {{ table_name }}
+<!-- Phase 1: Upload -->
+<div id="upload-section">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Bulk Add — {{ model_verbose }}</h5>
+                    <div class="text-muted small mt-1">
+                        Source: Schema.json | Table: {{ table_name }}
+                    </div>
                 </div>
-            </div>
-            <div class="card-body">
-                <p>Upload a CSV file to add multiple entries at once. The CSV must contain a header row using schema field names.</p>
+                <div class="card-body">
+                    <p>Upload a CSV file to preview and edit before importing.</p>
 
-                <div class="alert alert-info">
-                    <strong>Expected CSV columns:</strong><br>
-                    <code>{{ expected_headers|join:", " }}</code>
-                </div>
+                    <div class="alert alert-info">
+                        <strong>Expected CSV columns:</strong><br>
+                        <code>{{ expected_headers|join:", " }}</code>
+                    </div>
 
-                <form method="post" enctype="multipart/form-data">
-                    {% csrf_token %}
                     <div class="mb-3">
                         <label for="csv_file" class="form-label">CSV File</label>
-                        <input type="file" name="csv_file" id="csv_file" class="form-control" accept=".csv" required>
-                        <div class="form-text">Include the PK column. Unknown headers will be rejected.</div>
+                        <input type="file" id="csv_file" class="form-control" accept=".csv">
+                        <div class="form-text">File is parsed in-browser — nothing is sent until you confirm.</div>
                     </div>
-                    <button type="submit" class="btn btn-warning">
-                        <i class="bi bi-cloud-upload"></i> Upload &amp; Import
-                    </button>
-                    <a href="{% url 'datasets:table_view' table_name %}" class="btn btn-outline-secondary ms-2">Cancel</a>
-                </form>
+                    <div id="parse-error" class="alert alert-danger d-none"></div>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Phase 2: Editable table (hidden until CSV parsed) -->
+<div id="editor-section" class="d-none">
+    <div class="card mb-3">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <span class="badge bg-secondary">{{ table_name }}</span>
+                <span id="row-count-badge" class="badge bg-info text-dark ms-2"></span>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" id="btn-add-row" class="btn btn-sm btn-outline-success">
+                    <i class="bi bi-plus-circle"></i> Add Row
+                </button>
+                <button type="button" id="btn-clear-all" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash"></i> Clear All
+                </button>
+                <button type="button" id="btn-reupload" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-repeat"></i> Re-upload
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0" id="edit-table">
+                    <thead id="edit-thead"></thead>
+                    <tbody id="edit-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div id="validation-summary" class="text-muted small"></div>
+            <div>
+                <a href="{% url 'datasets:table_view' table_name %}" class="btn btn-outline-secondary me-2">Cancel</a>
+                <button type="button" id="btn-confirm" class="btn btn-warning">
+                    <i class="bi bi-cloud-upload"></i> Confirm Import
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden form for final submission -->
+    <form id="submit-form" method="post" class="d-none">
+        {% csrf_token %}
+        <input type="hidden" name="bulk_data" id="bulk-data-input">
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const FIELDS_META = {{ fields_meta_json|safe }};
+    const FIELD_NAMES = FIELDS_META.map(f => f.name);
+
+    const uploadSection  = document.getElementById('upload-section');
+    const editorSection  = document.getElementById('editor-section');
+    const fileInput       = document.getElementById('csv_file');
+    const parseError      = document.getElementById('parse-error');
+    const editThead       = document.getElementById('edit-thead');
+    const editTbody       = document.getElementById('edit-tbody');
+    const rowCountBadge   = document.getElementById('row-count-badge');
+    const validationSum   = document.getElementById('validation-summary');
+    const btnAddRow       = document.getElementById('btn-add-row');
+    const btnClearAll     = document.getElementById('btn-clear-all');
+    const btnReupload     = document.getElementById('btn-reupload');
+    const btnConfirm      = document.getElementById('btn-confirm');
+    const submitForm      = document.getElementById('submit-form');
+    const bulkDataInput   = document.getElementById('bulk-data-input');
+
+    // ── CSV Parser (handles quoted fields, newlines in quotes) ──
+    function parseCSV(text) {
+        const rows = [];
+        let i = 0;
+        while (i < text.length) {
+            const row = [];
+            while (i < text.length) {
+                let val = '';
+                if (text[i] === '"') {
+                    i++;
+                    while (i < text.length) {
+                        if (text[i] === '"') {
+                            if (i + 1 < text.length && text[i+1] === '"') {
+                                val += '"'; i += 2;
+                            } else { i++; break; }
+                        } else { val += text[i]; i++; }
+                    }
+                } else {
+                    while (i < text.length && text[i] !== ',' && text[i] !== '\n' && text[i] !== '\r') {
+                        val += text[i]; i++;
+                    }
+                }
+                row.push(val.trim());
+                if (i < text.length && text[i] === ',') { i++; }
+                else break;
+            }
+            // skip line endings
+            if (i < text.length && text[i] === '\r') i++;
+            if (i < text.length && text[i] === '\n') i++;
+            if (row.length > 0 && !(row.length === 1 && row[0] === '')) {
+                rows.push(row);
+            }
+        }
+        return rows;
+    }
+
+    // ── Render header ──
+    function renderHeader() {
+        editThead.innerHTML = '';
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<th class="text-center" style="width:40px">#</th>';
+        FIELDS_META.forEach(f => {
+            const th = document.createElement('th');
+            th.style.minWidth = '120px';
+            let label = f.name;
+            if (f.is_pk) label += ' <span class="badge bg-secondary">PK</span>';
+            if (f.is_fk) label += ' <span class="badge bg-info text-dark">FK</span>';
+            th.innerHTML = label;
+            tr.appendChild(th);
+        });
+        tr.innerHTML += '<th style="width:50px"></th>';
+        editThead.appendChild(tr);
+    }
+
+    // ── Create one row of inputs ──
+    function createRow(values) {
+        const tr = document.createElement('tr');
+        // Row number cell
+        const numTd = document.createElement('td');
+        numTd.className = 'text-center text-muted';
+        tr.appendChild(numTd);
+
+        FIELDS_META.forEach((f, idx) => {
+            const td = document.createElement('td');
+            const val = values && values[f.name] !== undefined ? values[f.name] : '';
+
+            if (f.base_type === 'bool') {
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.className = 'form-check-input';
+                cb.dataset.field = f.name;
+                cb.checked = ['1','true','yes','y','on'].includes(String(val).toLowerCase());
+                td.appendChild(cb);
+            } else {
+                const inp = document.createElement('input');
+                inp.type = f.input_type;
+                inp.className = 'form-control form-control-sm';
+                inp.dataset.field = f.name;
+                inp.value = val;
+                if (f.step) inp.step = f.step;
+                if (f.is_pk) inp.required = true;
+                inp.addEventListener('input', updateSummary);
+                td.appendChild(inp);
+            }
+            tr.appendChild(td);
+        });
+
+        // Delete button
+        const delTd = document.createElement('td');
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'btn btn-sm btn-outline-danger';
+        delBtn.innerHTML = '<i class="bi bi-x-lg"></i>';
+        delBtn.addEventListener('click', () => {
+            tr.remove();
+            renumberRows();
+            updateSummary();
+        });
+        delTd.appendChild(delBtn);
+        tr.appendChild(delTd);
+
+        editTbody.appendChild(tr);
+        renumberRows();
+        updateSummary();
+        return tr;
+    }
+
+    // ── Row numbering ──
+    function renumberRows() {
+        const rows = editTbody.querySelectorAll('tr');
+        rows.forEach((tr, i) => {
+            tr.querySelector('td').textContent = i + 1;
+        });
+        rowCountBadge.textContent = rows.length + ' row' + (rows.length !== 1 ? 's' : '');
+    }
+
+    // ── Validation summary ──
+    function updateSummary() {
+        const rows = editTbody.querySelectorAll('tr');
+        let empty = 0;
+        rows.forEach(tr => {
+            const inputs = tr.querySelectorAll('input[data-field]');
+            let allEmpty = true;
+            inputs.forEach(inp => {
+                if (inp.type === 'checkbox') return;
+                if (inp.value.trim() !== '') allEmpty = false;
+            });
+            if (allEmpty) empty++;
+        });
+        if (empty > 0) {
+            validationSum.textContent = empty + ' empty row' + (empty !== 1 ? 's' : '') + ' will be submitted as-is.';
+        } else {
+            validationSum.textContent = 'All rows have data.';
+        }
+    }
+
+    // ── Collect table data as JSON ──
+    function collectData() {
+        const rows = editTbody.querySelectorAll('tr');
+        const data = [];
+        rows.forEach(tr => {
+            const obj = {};
+            const inputs = tr.querySelectorAll('input[data-field]');
+            inputs.forEach(inp => {
+                if (inp.type === 'checkbox') {
+                    obj[inp.dataset.field] = inp.checked ? 'true' : '';
+                } else {
+                    obj[inp.dataset.field] = inp.value.trim();
+                }
+            });
+            // Skip rows that are completely empty
+            const hasData = Object.values(obj).some(v => v !== '');
+            if (hasData) data.push(obj);
+        });
+        return data;
+    }
+
+    // ── Map CSV headers to schema fields (case-insensitive + underscore-tolerant) ──
+    function mapHeaders(csvHeaders) {
+        const mapping = {};
+        const normalize = s => s.toLowerCase().replace(/[\s_-]+/g, '');
+        const fieldLookup = {};
+        FIELD_NAMES.forEach(fn => { fieldLookup[normalize(fn)] = fn; });
+
+        const warnings = [];
+        csvHeaders.forEach(h => {
+            const norm = normalize(h);
+            if (fieldLookup[norm]) {
+                mapping[h] = fieldLookup[norm];
+            } else {
+                warnings.push(h);
+            }
+        });
+        return { mapping, warnings };
+    }
+
+    // ── File input handler ──
+    fileInput.addEventListener('change', function() {
+        parseError.classList.add('d-none');
+        const file = this.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const text = e.target.result.replace(/^\uFEFF/, '');  // strip BOM
+                const parsed = parseCSV(text);
+                if (parsed.length < 2) {
+                    showParseError('CSV must have a header row and at least one data row.');
+                    return;
+                }
+
+                const csvHeaders = parsed[0];
+                const { mapping, warnings } = mapHeaders(csvHeaders);
+
+                if (Object.keys(mapping).length === 0) {
+                    showParseError(
+                        'No CSV columns matched the schema fields.<br>' +
+                        '<strong>CSV columns:</strong> ' + csvHeaders.join(', ') + '<br>' +
+                        '<strong>Expected:</strong> ' + FIELD_NAMES.join(', ')
+                    );
+                    return;
+                }
+
+                // Build rows as objects keyed by schema field names
+                renderHeader();
+                editTbody.innerHTML = '';
+
+                for (let r = 1; r < parsed.length; r++) {
+                    const vals = {};
+                    csvHeaders.forEach((h, ci) => {
+                        if (mapping[h]) {
+                            vals[mapping[h]] = parsed[r][ci] || '';
+                        }
+                    });
+                    createRow(vals);
+                }
+
+                // Show editor
+                uploadSection.classList.add('d-none');
+                editorSection.classList.remove('d-none');
+
+                if (warnings.length > 0) {
+                    showParseError('Ignored unrecognized columns: ' + warnings.join(', '), 'warning');
+                }
+
+            } catch (err) {
+                showParseError('Failed to parse CSV: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    });
+
+    function showParseError(msg, type) {
+        type = type || 'danger';
+        parseError.className = 'alert alert-' + type;
+        parseError.innerHTML = msg;
+        parseError.classList.remove('d-none');
+    }
+
+    // ── Button handlers ──
+    btnAddRow.addEventListener('click', () => {
+        createRow({});
+        // Scroll to and focus the new row
+        const lastRow = editTbody.querySelector('tr:last-child');
+        if (lastRow) {
+            lastRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            const firstInput = lastRow.querySelector('input:not([type=checkbox])');
+            if (firstInput) firstInput.focus();
+        }
+    });
+
+    btnClearAll.addEventListener('click', () => {
+        if (confirm('Remove all rows from the editor?')) {
+            editTbody.innerHTML = '';
+            renumberRows();
+            updateSummary();
+        }
+    });
+
+    btnReupload.addEventListener('click', () => {
+        editorSection.classList.add('d-none');
+        uploadSection.classList.remove('d-none');
+        fileInput.value = '';
+        editTbody.innerHTML = '';
+        parseError.classList.add('d-none');
+    });
+
+    btnConfirm.addEventListener('click', () => {
+        const data = collectData();
+        if (data.length === 0) {
+            alert('No rows to import. Add some data first.');
+            return;
+        }
+        if (!confirm('Import ' + data.length + ' row(s) into ' + '{{ table_name }}' + '?')) {
+            return;
+        }
+        bulkDataInput.value = JSON.stringify(data);
+        submitForm.submit();
+    });
+
+})();
+</script>
 {% endblock %}

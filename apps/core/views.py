@@ -4,6 +4,8 @@ from django.db import connection
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
+from apps.schemas.models import SchemaAuditLog
+from apps.core.models import AuditLog
 
 def home(request):
     """Home page with post-login redirect support."""
@@ -16,6 +18,7 @@ def home(request):
 
     context = {
         'page_title': 'PRISM Dashboard',
+        'recent_activity': AuditLog.objects.select_related('user')[:10],
     }
     return render(request, 'core/home.html', context)
 

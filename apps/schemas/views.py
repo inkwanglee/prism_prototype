@@ -1,6 +1,7 @@
 import json
 import os
 import traceback
+import jsonschema
 
 from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
@@ -9,8 +10,10 @@ from django.contrib import messages
 from django.utils import timezone
 from django.db import connection
 
-from .models import Schema, SchemaVersion
+from .models import Schema, SchemaVersion, SchemaAuditLog
 from .forms import SchemaForm, SchemaVersionForm
+
+from apps.core.models import AuditLog
 
 SCHEMA_FILE = os.path.join(settings.BASE_DIR, 'Schema.json')
 
@@ -80,6 +83,13 @@ def save_schema(request):
             with open(SCHEMA_FILE, 'w', encoding='utf-8') as f:
                 f.write(content)
             messages.success(request, 'Schema.json saved successfully.')
+
+            AuditLog.objects.create(
+                user=request.user,
+                action='save_schema',
+                model_name='Schema.json',
+                object_id='Schema.json',
+            )
         except json.JSONDecodeError as e:
             messages.error(request, f'Invalid JSON — not saved. Error: {e}')
     return redirect('schemas:list')
@@ -119,6 +129,13 @@ def initialize_db(request):
                 request,
                 f'Database initialized. Tables created/verified: {", ".join(created_tables)}'
             )
+
+            AuditLog.objects.create(
+                user=request.user,
+                action='initialize_db',
+                model_name='Schema.json',
+                object_id='Schema.json',
+            )
         except json.JSONDecodeError as e:
             messages.error(request, f'Invalid JSON in Schema.json: {e}')
         except Exception as e:
@@ -149,6 +166,12 @@ def schema_create(request):
             schema = form.save(commit=False)
             schema.created_by = request.user
             schema.save()
+
+            SchemaAuditLog.objects.create(
+                schema = schema,
+                action = 'created',
+                changed_by=request.user,
+            )
             messages.success(request, f'Schema "{schema.key}" created successfully.')
             return redirect('schemas:detail', pk=schema.pk)
     else:
@@ -177,6 +200,13 @@ def version_create(request, schema_pk):
                 import jsonschema
                 jsonschema.Draft202012Validator.check_schema(version.json_schema)
                 version.save()
+
+                SchemaAuditLog.objects.create(
+                    schema=schema,
+                    action='version_created',
+                    changed_by=request.user,
+                )
+
                 messages.success(request, f'Version {version.version} created successfully.')
                 return redirect('schemas:detail', pk=schema.pk)
             except jsonschema.SchemaError as e:
@@ -202,6 +232,13 @@ def version_approve(request, pk):
         version.approved_by = request.user
         version.approved_at = timezone.now()
         version.save()
+
+        SchemaAuditLog.objects.create(
+            schema=version.schema,
+            action='approved',
+            changed_by=request.user,
+        )
+
         messages.success(request, f'Version {version.version} approved.')
         return redirect('schemas:detail', pk=version.schema.pk)
 

@@ -11,6 +11,8 @@ import json
 import os
 import re
 
+from apps.core.models import AuditLog
+
 SCHEMA_FILE = os.path.join(settings.BASE_DIR, 'Schema.json')
 IDENTIFIER_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 
@@ -267,6 +269,13 @@ def table_add_entry(request, table_name):
             success, errors = _insert_row(table_name, table_fields, request.POST, from_csv=False)
             if success:
                 messages.success(request, f'Entry added to {table_name}.')
+
+                AuditLog.objects.create(
+                    user=request.user,
+                    action='add_entry',
+                    model_name=table_name,
+                    object_id='single',
+                )
                 return redirect('datasets:table_view', table_name=table_name)
             for error in errors:
                 messages.error(request, error)
@@ -334,6 +343,14 @@ def table_add_bulk(request, table_name):
 
                 if created:
                     messages.success(request, f'{created} row(s) added to {table_name}.')
+
+                    AuditLog.objects.create(
+                        user=request.user,
+                        action='add_bulk',
+                        model_name=table_name,
+                        object_id=f'{created} rows',
+                    )
+
                 if skipped:
                     messages.warning(request, f'{skipped} row(s) were skipped.')
 
@@ -378,6 +395,13 @@ def table_delete_entry(request, table_name, pk):
                 [pk],
             )
         messages.success(request, f'Entry deleted from {table_name}.')
+
+        AuditLog.objects.create(
+            user=request.user,
+            action='delete',
+            model_name=table_name,
+            object_id=str(pk),
+        )
     except Exception as e:
         messages.error(request, f'Delete failed: {e}')
 

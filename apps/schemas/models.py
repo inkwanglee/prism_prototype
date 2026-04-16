@@ -56,3 +56,16 @@ class SchemaVersion(models.Model):
     def schema_ref(self):
         """Schema reference string"""
         return f"{self.schema.key}@{self.version}"
+    
+class SchemaAuditLog(models.Model):
+    schema = models.ForeignKey(Schema, on_delete=models.CASCADE, related_name='audit_logs')
+    action = models.CharField(max_length=100)
+    changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-changed_at']
+
+    def __str__(self):
+        user = self.changed_by.username if self.changed_by else "Unknown"
+        return f"{self.schema.key} - {self.action} by {user}"

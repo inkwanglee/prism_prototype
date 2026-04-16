@@ -1,5 +1,5 @@
 {
-"Collars": {
+"Collars_test": {
 "CollarID": "int (pk)",
 "Current_EPM": "string",
 "Year_Report": "int",

@@ -63,7 +63,21 @@
                 <h5 class="mb-0">Recent Activity</h5>
             </div>
             <div class="card-body">
-                <p class="text-muted">No recent activity</p>
+                {% if recent_activity %}
+                    <ul class="list-unstyled mb-0">
+                        {% for log in recent_activity %}
+                            <li class="mb-3">
+                                <strong>{{ log.model_name }}</strong>
+                                — {{ log.action }}
+                                — {{ log.user.username|default:"Unknown" }}
+                                <br>
+                                <small class="text-muted">{{ log.timestamp }}</small>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted">No recent activity</p>
+                {% endif %}
             </div>
         </div>
     </div>

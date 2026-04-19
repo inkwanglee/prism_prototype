@@ -63,18 +63,12 @@ poetry.lock
 *.tmp
 *.bak
 
-# apps/__init__.py (빈 파일)
-
-# apps/core/__init__.py (빈 파일)
-
-# apps/schemas/__init__.py (빈 파일)
-
-# apps/datasets/__init__.py (빈 파일)
-
-# apps/ingestion/__init__.py (빈 파일)
-
-# apps/qaqc/__init__.py (빈 파일)
-
-# apps/lineage/__init__.py (빈 파일)
-
-# apps/accounts/__init__.py (빈 파일)
+# Empty __init__.py files (kept for package discovery)
+# apps/__init__.py
+# apps/core/__init__.py
+# apps/schemas/__init__.py
+# apps/datasets/__init__.py
+# apps/ingestion/__init__.py
+# apps/qaqc/__init__.py
+# apps/lineage/__init__.py
+# apps/accounts/__init__.py

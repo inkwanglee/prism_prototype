@@ -3,30 +3,30 @@ set -e
 
 echo "=== PRISM Setup Script ==="
 
-# Poetry 설치 확인
+# Check Poetry installation
 if ! command -v poetry &> /dev/null; then
     echo "Poetry not found. Installing..."
     curl -sSL https://install.python-poetry.org | python3 -
 fi
 
-# 의존성 설치
+# Install dependencies
 echo "Installing dependencies..."
 poetry install
 
-# Docker Compose 실행
+# Start Docker Compose services
 echo "Starting Docker services..."
 docker compose up -d db redis minio keycloak
 
-# 서비스가 준비될 때까지 대기
+# Wait for services to be ready
 echo "Waiting for services to be ready..."
 sleep 10
 
-# 마이그레이션 실행
+# Run migrations
 echo "Running migrations..."
 poetry run python manage.py makemigrations
 poetry run python manage.py migrate
 
-# 슈퍼유저 생성 (존재하지 않을 경우)
+# Create superuser (only if one does not already exist)
 echo "Creating superuser..."
 poetry run python manage.py shell << EOF
 from django.contrib.auth.models import User
@@ -37,7 +37,7 @@ else:
     print('Superuser already exists')
 EOF
 
-# Static 파일 수집
+# Collect static files
 echo "Collecting static files..."
 poetry run python manage.py collectstatic --noinput
 

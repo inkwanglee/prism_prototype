@@ -2,7 +2,10 @@ import logging
 from urllib.parse import quote
 
 from django.conf import settings
+from django.contrib.auth.models import Group
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
+
+from apps.accounts.permissions import GUEST_ROLE_NAME, GUEST_GROUP_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +64,17 @@ class PrismOIDCBackend(OIDCAuthenticationBackend):
         project_ids = claims.get('project_ids', [])
         user.prism_roles = prism_roles
         user.project_ids = project_ids
+
+        # Mirror the "guest" role into a local Django Group so that
+        # permissions checks still work even if session claims are missing.
+        try:
+            guest_group, _ = Group.objects.get_or_create(name=GUEST_GROUP_NAME)
+            if GUEST_ROLE_NAME in prism_roles:
+                user.groups.add(guest_group)
+            else:
+                user.groups.remove(guest_group)
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning(f"Could not sync guest group for {user.username}: {exc}")
 
 
 def provider_logout_url(request):

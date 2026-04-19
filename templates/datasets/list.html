@@ -1,6 +1,13 @@
 {% extends 'base.html' %}
 
 {% block content %}
+{% if is_guest %}
+<div class="alert alert-warning small">
+    <i class="bi bi-eye"></i>
+    You are signed in as a <strong>read-only guest</strong>. You can view tables but cannot add, edit, or delete data.
+</div>
+{% endif %}
+
 <div class="card mb-3">
     <div class="card-body">
         <form method="get" class="row g-3">
@@ -42,6 +49,7 @@
                                    class="btn btn-outline-primary" title="View data">
                                     <i class="bi bi-eye"></i> View
                                 </a>
+                                {% if not is_guest %}
                                 <a href="{% url 'datasets:table_add' table.table_name %}"
                                    class="btn btn-outline-success" title="Add single entry">
                                     <i class="bi bi-plus-circle"></i> Add Entry
@@ -50,6 +58,7 @@
                                    class="btn btn-outline-warning" title="Bulk add via CSV">
                                     <i class="bi bi-cloud-upload"></i> Add Bulk
                                 </a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

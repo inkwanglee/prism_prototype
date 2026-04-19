@@ -1,9 +1,11 @@
 {% extends 'base.html' %}
 
 {% block page_actions %}
+{% if not is_guest %}
 <a href="{% url 'schemas:version_create' schema.pk %}" class="btn btn-primary">
     <i class="bi bi-plus-circle"></i> Add Version
 </a>
+{% endif %}
 <a href="{% url 'schemas:list' %}" class="btn btn-outline-secondary">
     <i class="bi bi-arrow-left"></i> Back to List
 </a>
@@ -20,13 +22,13 @@
                 <dl class="row">
                     <dt class="col-sm-3">Key</dt>
                     <dd class="col-sm-9"><code>{{ schema.key }}</code></dd>
-                    
+
                     <dt class="col-sm-3">Owner</dt>
                     <dd class="col-sm-9">{{ schema.owner }}</dd>
-                    
+
                     <dt class="col-sm-3">Description</dt>
                     <dd class="col-sm-9">{{ schema.description|default:"No description" }}</dd>
-                    
+
                     <dt class="col-sm-3">Created</dt>
                     <dd class="col-sm-9">{{ schema.created_at }}</dd>
                 </dl>
@@ -59,7 +61,7 @@
                                 {% endif %}
                             </div>
                             <div>
-                                {% if version.status == 'draft' %}
+                                {% if version.status == 'draft' and not is_guest %}
                                 <form method="post" action="{% url 'schemas:version_approve' version.pk %}" class="d-inline">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-success">
@@ -85,9 +87,11 @@
                 <h6 class="mb-0">Quick Actions</h6>
             </div>
             <div class="list-group list-group-flush">
+                {% if not is_guest %}
                 <a href="{% url 'schemas:version_create' schema.pk %}" class="list-group-item list-group-item-action">
                     <i class="bi bi-plus-circle"></i> Add New Version
                 </a>
+                {% endif %}
                 <a href="/api/schemas/{{ schema.pk }}/" class="list-group-item list-group-item-action" target="_blank">
                     <i class="bi bi-code-slash"></i> View API
                 </a>

@@ -14,6 +14,7 @@ from .models import Schema, SchemaVersion, SchemaAuditLog
 from .forms import SchemaForm, SchemaVersionForm
 
 from apps.core.models import AuditLog
+from apps.accounts.permissions import non_guest_required
 
 SCHEMA_FILE = os.path.join(settings.BASE_DIR, 'Schema.json')
 
@@ -27,13 +28,39 @@ TYPE_MAP = {
 }
 
 
+def _autoincrement_pk_sql():
+    """
+    Return the correct auto-increment PRIMARY KEY DDL for the active DB vendor.
+
+    Postgres  -> SERIAL PRIMARY KEY
+    SQLite    -> INTEGER PRIMARY KEY AUTOINCREMENT
+    (fallback -> INTEGER PRIMARY KEY)
+    """
+    vendor = connection.vendor
+    if vendor == 'postgresql':
+        return "SERIAL PRIMARY KEY"
+    if vendor == 'sqlite':
+        return "INTEGER PRIMARY KEY AUTOINCREMENT"
+    return "INTEGER PRIMARY KEY"
+
+
 def parse_type(type_str):
-    """Parse a Schema.json type string into a SQL column definition."""
-    # Handle string(N) pattern
+    """
+    Parse a Schema.json type string into a SQL column definition.
+
+    Special handling:
+    - `int (pk)`  -> auto-increment PK (SERIAL on Postgres)
+    - `string(N)` -> VARCHAR(N)
+    """
     base = type_str.split('(')[0].split()[0].strip().lower()
+
+    # Auto-increment integer primary key
+    if base == "int" and "(pk)" in type_str:
+        return _autoincrement_pk_sql()
+
     sql_type = TYPE_MAP.get(base, "TEXT")
 
-    # Check for string with length like string(10)
+    # string(N) -> VARCHAR(N)
     if base == "string" and '(' in type_str.split()[0]:
         try:
             length = type_str.split('(')[1].split(')')[0]
@@ -41,6 +68,7 @@ def parse_type(type_str):
         except (IndexError, ValueError):
             pass
 
+    # Non-int PK (e.g. string PK) stays manual
     if "(pk)" in type_str:
         return f"{sql_type} PRIMARY KEY"
     return sql_type
@@ -73,11 +101,11 @@ def schema_list(request):
 
 
 @login_required
+@non_guest_required
 def save_schema(request):
     """Save edited Schema.json content to disk."""
     if request.method == 'POST':
         content = request.POST.get('schema_content', '')
-        # Validate it's valid JSON before saving
         try:
             json.loads(content)
             with open(SCHEMA_FILE, 'w', encoding='utf-8') as f:
@@ -96,6 +124,7 @@ def save_schema(request):
 
 
 @login_required
+@non_guest_required
 def initialize_db(request):
     """Create database tables from Schema.json."""
     if request.method == 'POST':
@@ -127,7 +156,8 @@ def initialize_db(request):
 
             messages.success(
                 request,
-                f'Database initialized. Tables created/verified: {", ".join(created_tables)}'
+                f'Database initialized. Tables created/verified: {", ".join(created_tables)}. '
+                f'Note: existing tables are not modified — drop and re-create to pick up PK auto-increment.'
             )
 
             AuditLog.objects.create(
@@ -158,6 +188,7 @@ def schema_detail(request, pk):
 
 
 @login_required
+@non_guest_required
 def schema_create(request):
     """Create a new schema."""
     if request.method == 'POST':
@@ -168,8 +199,8 @@ def schema_create(request):
             schema.save()
 
             SchemaAuditLog.objects.create(
-                schema = schema,
-                action = 'created',
+                schema=schema,
+                action='created',
                 changed_by=request.user,
             )
             messages.success(request, f'Schema "{schema.key}" created successfully.')
@@ -185,6 +216,7 @@ def schema_create(request):
 
 
 @login_required
+@non_guest_required
 def version_create(request, schema_pk):
     """Create a schema version."""
     schema = get_object_or_404(Schema, pk=schema_pk)
@@ -223,6 +255,7 @@ def version_create(request, schema_pk):
 
 
 @login_required
+@non_guest_required
 def version_approve(request, pk):
     """Approve a schema version."""
     version = get_object_or_404(SchemaVersion, pk=pk)

@@ -1,17 +1,14 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.apps import apps
-from django import forms
 from django.conf import settings
 from django.db import connection, transaction
-import csv
-import io
 import json
 import os
 import re
 
 from apps.core.models import AuditLog
+from apps.accounts.permissions import non_guest_required
 
 SCHEMA_FILE = os.path.join(settings.BASE_DIR, 'Schema.json')
 IDENTIFIER_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
@@ -60,16 +57,29 @@ def _pk_field(fields):
     return None
 
 
+def _is_auto_pk(type_str):
+    """
+    True if this column is an auto-generated primary key
+    (integer PK -> DB sequence / SERIAL).
+    """
+    return '(pk)' in type_str and _parse_base_type(type_str) == 'int'
+
+
 def _build_input_meta(field_name, type_str):
     base_type = _parse_base_type(type_str)
+    is_pk = '(pk)' in type_str
+    is_fk = '(fk' in type_str
+    auto_generated = _is_auto_pk(type_str)
 
     meta = {
         'name': field_name,
         'type_str': type_str,
         'base_type': base_type,
-        'is_pk': '(pk)' in type_str,
-        'is_fk': '(fk)' in type_str,
-        'required': '(pk)' in type_str,
+        'is_pk': is_pk,
+        'is_fk': is_fk,
+        'auto_generated': auto_generated,
+        # Auto-generated PKs are NOT required on input (DB fills them)
+        'required': is_pk and not auto_generated,
         'input_type': 'text',
         'step': None,
     }
@@ -135,11 +145,22 @@ def _get_table_columns(table_name):
 
 
 def _insert_row(table_name, table_fields, incoming_data, from_csv=False):
+    """
+    Insert one row into the given table.
+
+    PK automation:
+    - For auto-generated PK columns (int + pk), if no value was supplied
+      we OMIT the column from the INSERT list so the DB sequence fills it.
+    - If the caller *did* supply a value, we honour it (useful for CSV imports
+      that carry pre-existing IDs).
+    """
     columns = []
     values = []
     errors = []
 
     for field_name, type_str in table_fields.items():
+        auto_pk = _is_auto_pk(type_str)
+
         if _parse_base_type(type_str) == 'bool':
             raw_value = incoming_data.get(field_name)
         else:
@@ -147,7 +168,12 @@ def _insert_row(table_name, table_fields, incoming_data, from_csv=False):
             if raw_value is not None:
                 raw_value = str(raw_value).strip()
 
-        if '(pk)' in type_str and (raw_value is None or raw_value == ''):
+        # Auto-generated PK with no value: skip → DB generates it.
+        if auto_pk and (raw_value is None or raw_value == ''):
+            continue
+
+        # Manual PK (e.g. string PK) must be supplied.
+        if '(pk)' in type_str and not auto_pk and (raw_value is None or raw_value == ''):
             errors.append(f'{field_name} is required.')
             continue
 
@@ -167,8 +193,14 @@ def _insert_row(table_name, table_fields, incoming_data, from_csv=False):
     quoted_columns = ', '.join(_quote_ident(col) for col in columns)
     placeholders = ', '.join(['%s'] * len(values))
 
-    sql = f'INSERT INTO {quoted_table} ({quoted_columns}) VALUES ({placeholders})'
+    # Edge case: all columns were auto-generated / skipped. Use DEFAULT VALUES.
+    if not columns:
+        sql = f'INSERT INTO {quoted_table} DEFAULT VALUES'
+        with connection.cursor() as cur:
+            cur.execute(sql)
+        return True, []
 
+    sql = f'INSERT INTO {quoted_table} ({quoted_columns}) VALUES ({placeholders})'
     with connection.cursor() as cur:
         cur.execute(sql, values)
 
@@ -250,6 +282,7 @@ def table_view(request, table_name):
 
 
 @login_required
+@non_guest_required
 def table_add_entry(request, table_name):
     schema = _load_schema()
 
@@ -262,14 +295,16 @@ def table_add_entry(request, table_name):
         return redirect('datasets:list')
 
     table_fields = schema[table_name]
-    field_meta = [_build_input_meta(field_name, type_str) for field_name, type_str in table_fields.items()]
+    all_fields_meta = [_build_input_meta(n, t) for n, t in table_fields.items()]
+    # Hide auto-generated PKs from the form entirely.
+    visible_fields = [f for f in all_fields_meta if not f['auto_generated']]
+    auto_pk_fields = [f['name'] for f in all_fields_meta if f['auto_generated']]
 
     if request.method == 'POST':
         try:
             success, errors = _insert_row(table_name, table_fields, request.POST, from_csv=False)
             if success:
                 messages.success(request, f'Entry added to {table_name}.')
-
                 AuditLog.objects.create(
                     user=request.user,
                     action='add_entry',
@@ -285,12 +320,14 @@ def table_add_entry(request, table_name):
     context = {
         'page_title': f'Add Entry — {table_name}',
         'table_name': table_name,
-        'fields': field_meta,
+        'fields': visible_fields,
+        'auto_pk_fields': auto_pk_fields,
     }
     return render(request, 'datasets/table_add.html', context)
 
 
 @login_required
+@non_guest_required
 def table_add_bulk(request, table_name):
     schema = _load_schema()
 
@@ -305,13 +342,9 @@ def table_add_bulk(request, table_name):
     table_fields = schema[table_name]
     expected_headers = list(table_fields.keys())
 
-    # Build field metadata for the JS-driven editable table
-    fields_meta = []
-    for field_name, type_str in table_fields.items():
-        fields_meta.append(_build_input_meta(field_name, type_str))
+    fields_meta = [_build_input_meta(n, t) for n, t in table_fields.items()]
 
     if request.method == 'POST':
-        # Handle JSON submission from the editable table
         bulk_data_raw = request.POST.get('bulk_data')
         if bulk_data_raw:
             try:
@@ -325,7 +358,6 @@ def table_add_bulk(request, table_name):
 
                 with transaction.atomic():
                     for idx, row in enumerate(rows_data, start=1):
-                        # Only include known fields
                         normalized = {}
                         for field_name in table_fields:
                             if field_name in row:
@@ -343,7 +375,6 @@ def table_add_bulk(request, table_name):
 
                 if created:
                     messages.success(request, f'{created} row(s) added to {table_name}.')
-
                     AuditLog.objects.create(
                         user=request.user,
                         action='add_bulk',
@@ -372,6 +403,7 @@ def table_add_bulk(request, table_name):
 
 
 @login_required
+@non_guest_required
 def table_delete_entry(request, table_name, pk):
     schema = _load_schema()
 

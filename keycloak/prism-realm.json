@@ -18,7 +18,8 @@
       { "name": "exploration_geologist", "description": "Inputs field data and reviews QAQC" },
       { "name": "lab_integration_engineer", "description": "Connects lab feeds" },
       { "name": "platform_sre", "description": "Observability, performance, backups" },
-      { "name": "security_admin", "description": "Roles, policies, audits" }
+      { "name": "security_admin", "description": "Roles, policies, audits" },
+      { "name": "guest", "description": "Read-only access — can view all pages but cannot create, edit, or delete data" }
     ]
   },
   "users": [
@@ -91,6 +92,16 @@
       "lastName": "Security",
       "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
       "realmRoles": ["security_admin"]
+    },
+    {
+      "username": "guest",
+      "email": "guest@prism.dev",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Guest",
+      "lastName": "User",
+      "credentials": [{ "type": "password", "value": "guest123", "temporary": false }],
+      "realmRoles": ["guest"]
     }
   ],
   "clients": [
@@ -137,7 +148,7 @@
       "roles": [
         "geodesK_user", "data_steward", "data_engineer",
         "exploration_geologist", "lab_integration_engineer",
-        "platform_sre", "security_admin"
+        "platform_sre", "security_admin", "guest"
       ]
     }
   ]

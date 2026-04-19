@@ -17,6 +17,15 @@
                 </div>
             </div>
             <div class="card-body">
+                {% if auto_pk_fields %}
+                <div class="alert alert-info small mb-4">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Auto-generated:</strong>
+                    {% for pk in auto_pk_fields %}<code>{{ pk }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}
+                    will be assigned automatically by the database.
+                </div>
+                {% endif %}
+
                 <form method="post">
                     {% csrf_token %}
 

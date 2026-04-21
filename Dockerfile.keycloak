@@ -1,0 +1,5 @@
+FROM quay.io/keycloak/keycloak:24.0
+
+COPY keycloak/prism-realm.json /opt/keycloak/data/import/prism-realm.json
+
+CMD ["start-dev", "--import-realm"]

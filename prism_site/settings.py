@@ -20,6 +20,9 @@ CSRF_TRUSTED_ORIGINS = [
     "https://prism-web.kindground-d178727f.australiaeast.azurecontainerapps.io",
 ]
 
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True 
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -44,7 +47,6 @@ INSTALLED_APPS = [
     'apps.accounts',
     'apps.schemas',
     'apps.datasets',
-    'apps.ingestion',
     'apps.qaqc',
     'apps.lineage',
 ]

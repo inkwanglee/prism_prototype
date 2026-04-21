@@ -85,12 +85,6 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.app_name == 'ingestion' %}active{% endif %}"
-                                href="{% url 'ingestion:list' %}">
-                                <i class="bi bi-cloud-upload"></i> Ingestion
-                            </a>
-                        </li>
-                        <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.app_name == 'qaqc' %}active{% endif %}"
                                 href="{% url 'qaqc:dashboard' %}">
                                 <i class="bi bi-check2-circle"></i> QAQC

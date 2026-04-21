@@ -15,46 +15,38 @@
 
 <div class="row g-4 mt-2">
     <!-- Quick Stats -->
-    <div class="col-md-3">
+    <div class="row g-4 mt-2">
+    <div class="col-md-4">
         <div class="card">
             <div class="card-body">
-                <h6 class="card-subtitle mb-2 text-muted">Schemas</h6>
-                <h2 class="card-title">{{ schemas_count|default:0 }}</h2>
-                <a href="{% url 'schemas:list' %}" class="card-link">View all <i class="bi bi-arrow-right"></i></a>
+                <h6 class="card-subtitle mb-2 text-muted">Schema Tables</h6>
+                <h2 class="card-title">{{ schema_tables_count|default:0 }}</h2>
+                <a href="{% url 'schemas:list' %}" class="btn btn-sm btn-outline-primary mt-2">Create More</a>
             </div>
         </div>
     </div>
-    
-    <div class="col-md-3">
+
+    <div class="col-md-4">
         <div class="card">
             <div class="card-body">
-                <h6 class="card-subtitle mb-2 text-muted">Datasets</h6>
-                <h2 class="card-title">{{ datasets_count|default:0 }}</h2>
-                <a href="{% url 'datasets:list' %}" class="card-link">View all <i class="bi bi-arrow-right"></i></a>
+                <h6 class="card-subtitle mb-2 text-muted">Total Rows</h6>
+                <h2 class="card-title">{{ total_rows_count|default:0 }}</h2>
+                <a href="{% url 'datasets:list' %}" class="btn btn-sm btn-outline-primary mt-2">Add More</a>
             </div>
         </div>
     </div>
-    
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-body">
-                <h6 class="card-subtitle mb-2 text-muted">Ingestion Runs</h6>
-                <h2 class="card-title">{{ runs_count|default:0 }}</h2>
-                <a href="{% url 'ingestion:list' %}" class="card-link">View all <i class="bi bi-arrow-right"></i></a>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
+
+    <div class="col-md-4">
         <div class="card">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">QAQC Status</h6>
-                <h2 class="card-title text-success"><i class="bi bi-check-circle"></i></h2>
-                <a href="{% url 'qaqc:dashboard' %}" class="card-link">View dashboard <i class="bi bi-arrow-right"></i></a>
+                <h2 class="card-title text-success">{{ qaqc_status|default:"Healthy" }}</h2>
+                <a href="{% url 'qaqc:dashboard' %}" class="btn btn-sm btn-outline-success mt-2">Open QAQC</a>
             </div>
         </div>
     </div>
 </div>
+
 
 <div class="row mt-4">
     <div class="col-md-12">

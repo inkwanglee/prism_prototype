@@ -14,7 +14,6 @@ urlpatterns = [
     path('accounts/', include('apps.accounts.urls')),
     path('schemas/', include('apps.schemas.urls')),
     path('datasets/', include('apps.datasets.urls')),
-    path('ingestion/', include('apps.ingestion.urls')),
     path('qaqc/', include('apps.qaqc.urls')),
     path('lineage/', include('apps.lineage.urls')),
 

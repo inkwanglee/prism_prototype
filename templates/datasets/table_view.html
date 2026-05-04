@@ -26,7 +26,7 @@
         <span class="text-muted">
             {{ total_count }} total record{{ total_count|pluralize }}
             {% if total_count > 500 %}
-                <span class="badge bg-warning text-dark ms-2">Showing first 500</span>
+            <span class="badge bg-warning text-dark ms-2">Showing first 500</span>
             {% endif %}
         </span>
     </div>
@@ -42,22 +42,29 @@
                         {% for field in fields %}
                         <th>{{ field }}</th>
                         {% endfor %}
+
                         {% if pk_name and not is_guest %}
                         <th class="text-end">Actions</th>
                         {% endif %}
                     </tr>
                 </thead>
+
                 <tbody>
                     {% for row in rows %}
                     <tr>
                         {% for cell in row.cells %}
                         <td>{{ cell }}</td>
                         {% endfor %}
+
                         {% if pk_name and not is_guest %}
                         <td class="text-end">
+                            <a href="{% url 'datasets:table_edit' table_name row.pk %}"
+                                class="btn btn-sm btn-outline-primary me-1" title="Edit">
+                                <i class="bi bi-pencil-square"></i>
+                            </a>
+
                             <form method="post" action="{% url 'datasets:table_delete' table_name row.pk %}"
-                                  style="display:inline"
-                                  onsubmit="return confirm('Delete this entry?');">
+                                style="display:inline" onsubmit="return confirm('Delete this entry?');">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
                                     <i class="bi bi-trash"></i>

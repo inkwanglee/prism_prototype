@@ -272,6 +272,100 @@ def _insert_row(table_name, table_fields, incoming_data, from_csv=False):
     return True, []
 
 
+# Update logic is similar to insert, but we always require the PK to identify the row,
+def _get_row_by_pk(table_name, pk_name, pk):
+    """
+    Fetch one row from a schema-created database table by its primary key.
+
+    Returns:
+    - dict of column_name -> value if found
+    - None if no matching row exists
+    """
+    columns = _get_table_columns(table_name)
+    quoted_columns = ', '.join(_quote_ident(col) for col in columns)
+
+    with connection.cursor() as cur:
+        cur.execute(
+            f'''
+            SELECT {quoted_columns}
+            FROM {_quote_ident(table_name)}
+            WHERE {_quote_ident(pk_name)} = %s
+            LIMIT 1
+            ''',
+            [pk],
+        )
+        row = cur.fetchone()
+
+    if row is None:
+        return None
+
+    return dict(zip(columns, row))
+
+
+def _update_row(table_name, table_fields, pk_name, pk, incoming_data):
+    """
+    Update one existing row in a schema-created database table.
+
+    Important:
+    - The PK is skipped so users cannot accidentally change the row identity.
+    - Values are coerced using the same _coerce_value helper as Add Entry.
+    - Table/column names still go through _quote_ident for safety.
+    """
+    set_columns = []
+    values = []
+    errors = []
+
+    for field_name, type_str in table_fields.items():
+        # Never edit the primary key.
+        if field_name == pk_name:
+            continue
+
+        if _parse_base_type(type_str) == 'bool':
+            raw_value = incoming_data.get(field_name)
+        else:
+            raw_value = incoming_data.get(field_name, '')
+            if raw_value is not None:
+                raw_value = str(raw_value).strip()
+
+        try:
+            coerced = _coerce_value(raw_value, type_str, from_csv=False)
+        except (ValueError, TypeError):
+            errors.append(f'{field_name} must be a valid {_parse_base_type(type_str)}.')
+            continue
+
+        set_columns.append(field_name)
+        values.append(coerced)
+
+    if errors:
+        return False, errors
+
+    if not set_columns:
+        return False, ['There are no editable columns for this table.']
+
+    assignments = ', '.join(
+        f'{_quote_ident(col)} = %s'
+        for col in set_columns
+    )
+
+    values.append(pk)
+
+    with connection.cursor() as cur:
+        cur.execute(
+            f'''
+            UPDATE {_quote_ident(table_name)}
+            SET {assignments}
+            WHERE {_quote_ident(pk_name)} = %s
+            ''',
+            values,
+        )
+
+    return True, []
+
+
+
+
+
+
 @login_required
 def table_list(request):
     schema = _load_schema()
@@ -300,6 +394,8 @@ def table_list(request):
         'search_q': request.GET.get('q', '').strip(),
     }
     return render(request, 'datasets/list.html', context)
+
+
 
 
 @login_required
@@ -467,6 +563,84 @@ def table_add_bulk(request, table_name):
     }
     return render(request, 'datasets/table_bulk.html', context)
 
+@login_required
+@non_guest_required
+def table_edit_entry(request, table_name, pk):
+    schema = _load_schema()
+
+    if table_name not in schema:
+        messages.error(request, 'Table not found in Schema.json.')
+        return redirect('datasets:list')
+
+    if not _table_exists(table_name):
+        messages.error(request, f'Table "{table_name}" has not been initialized yet.')
+        return redirect('datasets:list')
+
+    table_fields = schema[table_name]
+    pk_name = _pk_field(table_fields)
+
+    if not pk_name:
+        messages.error(request, f'No primary key found for {table_name}.')
+        return redirect('datasets:table_view', table_name=table_name)
+
+    current_row = _get_row_by_pk(table_name, pk_name, pk)
+
+    if current_row is None:
+        messages.error(request, f'Entry {pk} was not found in {table_name}.')
+        return redirect('datasets:table_view', table_name=table_name)
+
+    all_fields_meta = [
+        _build_input_meta(field_name, type_str, schema=schema)
+        for field_name, type_str in table_fields.items()
+    ]
+
+    visible_fields = []
+
+    for field in all_fields_meta:
+        # Do not let users edit the primary key.
+        if field['name'] == pk_name:
+            continue
+
+        field = field.copy()
+        field['value'] = current_row.get(field['name'])
+        visible_fields.append(field)
+
+    if request.method == 'POST':
+        try:
+            success, errors = _update_row(
+                table_name,
+                table_fields,
+                pk_name,
+                pk,
+                request.POST,
+            )
+
+            if success:
+                messages.success(request, f'Entry updated in {table_name}.')
+                AuditLog.objects.create(
+                    user=request.user,
+                    action='edit_entry',
+                    model_name=table_name,
+                    object_id=str(pk),
+                )
+                return redirect('datasets:table_view', table_name=table_name)
+
+            for error in errors:
+                messages.error(request, error)
+
+        except Exception as e:
+            messages.error(request, f'Update failed: {e}')
+
+    context = {
+        'page_title': f'Edit Entry — {table_name}',
+        'table_name': table_name,
+        'pk_name': pk_name,
+        'pk_value': pk,
+        'fields': visible_fields,
+        'current_row': current_row,
+    }
+
+    return render(request, 'datasets/table_edit.html', context)
 
 @login_required
 @non_guest_required

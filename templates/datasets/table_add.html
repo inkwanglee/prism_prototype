@@ -53,6 +53,18 @@
                                     class="form-check-input"
                                 >
                             </div>
+                            {% elif field.input_type == 'select' %}
+                            <select
+                                id="{{ field.name }}"
+                                name="{{ field.name }}"
+                                class="form-select"
+                                {% if field.required %}required{% endif %}
+                            >
+                                <option value="">— Select —</option>
+                                {% for opt in field.fk_options %}
+                                    <option value="{{ opt.value }}">{{ opt.label }}</option>
+                                {% endfor %}
+                            </select>
                         {% else %}
                             <input
                                 type="{{ field.input_type }}"

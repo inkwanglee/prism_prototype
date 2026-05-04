@@ -101,6 +101,28 @@
     const FIELDS_META = {{ fields_meta_json|safe }};
     const FIELD_NAMES = FIELDS_META.map(f => f.name);
 
+    // Build reverse-lookup maps for FK fields: display label → PK value
+    const FK_LOOKUP = {};
+    FIELDS_META.forEach(f => {
+        if (f.fk_options && f.fk_options.length > 0) {
+            const map = {};
+            f.fk_options.forEach(opt => {
+                map[String(opt.label).toLowerCase().trim()] = String(opt.value);
+                map[String(opt.value)] = String(opt.value);  // also accept raw IDs
+            });
+            FK_LOOKUP[f.name] = map;
+        }
+    });
+
+    // Resolve a CSV value for an FK field: try display name first, then raw ID
+    function resolveFK(fieldName, rawValue) {
+        if (!rawValue || !FK_LOOKUP[fieldName]) return rawValue;
+        const key = String(rawValue).toLowerCase().trim();
+        if (FK_LOOKUP[fieldName][key] !== undefined) return FK_LOOKUP[fieldName][key];
+        return rawValue;  // pass through as-is if no match
+    }
+
+
     const uploadSection  = document.getElementById('upload-section');
     const editorSection  = document.getElementById('editor-section');
     const fileInput       = document.getElementById('csv_file');
@@ -205,7 +227,26 @@
                 cb.dataset.field = f.name;
                 cb.checked = ['1','true','yes','y','on'].includes(String(val).toLowerCase());
                 td.appendChild(cb);
-            } else {
+            } 
+             else if (f.input_type === 'select' && f.fk_options && f.fk_options.length > 0) {
+                const sel = document.createElement('select');
+                sel.className = 'form-select form-select-sm';
+                sel.dataset.field = f.name;
+                const blank = document.createElement('option');
+                blank.value = '';
+                blank.textContent = '— Select —';
+                sel.appendChild(blank);
+                const resolvedVal = resolveFK(f.name, val);
+                f.fk_options.forEach(opt => {
+                    const o = document.createElement('option');
+                    o.value = opt.value;
+                    o.textContent = opt.label;
+                    if (String(opt.value) === String(resolvedVal)) o.selected = true;
+                    sel.appendChild(o);
+                });
+                sel.addEventListener('change', updateSummary);
+                td.appendChild(sel);
+            }else {
                 const inp = document.createElement('input');
                 inp.type = f.input_type;
                 inp.className = 'form-control form-control-sm';
@@ -251,7 +292,7 @@
         const rows = editTbody.querySelectorAll('tr');
         let empty = 0;
         rows.forEach(tr => {
-            const inputs = tr.querySelectorAll('input[data-field]');
+            const inputs = tr.querySelectorAll('input[data-field], select[data-field]');
             let allEmpty = true;
             inputs.forEach(inp => {
                 if (inp.type === 'checkbox') return;
@@ -273,7 +314,7 @@
         const data = [];
         rows.forEach(tr => {
             const obj = {};
-            const inputs = tr.querySelectorAll('input[data-field]');
+            const inputs = tr.querySelectorAll('input[data-field], select[data-field]');
             inputs.forEach(inp => {
                 if (inp.type === 'checkbox') {
                     obj[inp.dataset.field] = inp.checked ? 'true' : '';
@@ -371,7 +412,7 @@
         const lastRow = editTbody.querySelector('tr:last-child');
         if (lastRow) {
             lastRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            const firstInput = lastRow.querySelector('input:not([type=checkbox]):not([readonly])');
+            const firstInput = lastRow.querySelector('input:not([type=checkbox]):not([readonly]), select');
             if (firstInput) firstInput.focus();
         }
     });

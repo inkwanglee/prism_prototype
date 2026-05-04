@@ -59,17 +59,80 @@ def _pk_field(fields):
 
 def _is_auto_pk(type_str):
     """
-    True if this column is an auto-generated primary key
-    (integer PK -> DB sequence / SERIAL).
+    True if this column is a PK
+    Primary keys are managed by the database
+    This is a remanant of previous code removing may break something elsewhere
     """
-    return '(pk)' in type_str and _parse_base_type(type_str) == 'int'
+    return '(pk)' in type_str
+
+def _parse_fk_reference(type_str):
+    """
+    Parse FK reference from type string.
+    e.g. 'int (fk to Company.CompanyID)' -> ('Company', 'CompanyID')
+         'string (fk)' -> None  (unresolved FK, no dropdown)
+    """
+    match = re.search(r'\(fk\s+to\s+(\w+)\.(\w+)\)', type_str)
+    if match:
+        return match.group(1), match.group(2)
+    return None
+
+def _get_fk_options(ref_table, ref_column, schema):
+    """
+    Fetch available FK values from the referenced table.
+    Returns a list of dicts: {'value': <pk_value>, 'label': '<display_text>'}.
+    The label combines the PK with the first non-PK string column for readability.
+    """
+    if not _table_exists(ref_table):
+        return []
+
+    ref_fields = schema.get(ref_table, {})
+    if not ref_fields:
+        return []
+
+    # Find a good display column: first non-PK string column in the ref table
+    display_col = None
+    found_pk = False
+    for fname, ftype in ref_fields.items():
+        if '(pk)' in ftype:
+            found_pk = True
+            continue
+        if found_pk:
+            display_col = fname
+            break
+
+    try:
+        with connection.cursor() as cur:
+            if display_col and _is_safe_identifier(display_col):
+                cur.execute(
+                    f'SELECT {_quote_ident(ref_column)}, {_quote_ident(display_col)} '
+                    f'FROM {_quote_ident(ref_table)} '
+                    f'ORDER BY {_quote_ident(display_col)} LIMIT 1000'
+                )
+                return [
+                    {'value': row[0], 'label': f'{row[1]}' if row[1] else str(row[0])}
+                    for row in cur.fetchall()
+                ]
+            else:
+                cur.execute(
+                    f'SELECT {_quote_ident(ref_column)} '
+                    f'FROM {_quote_ident(ref_table)} '
+                    f'ORDER BY {_quote_ident(ref_column)} LIMIT 1000'
+                )
+                return [
+                    {'value': row[0], 'label': str(row[0])}
+                    for row in cur.fetchall()
+                ]
+    except Exception:
+        return []
 
 
-def _build_input_meta(field_name, type_str):
+def _build_input_meta(field_name, type_str, schema=None):
     base_type = _parse_base_type(type_str)
     is_pk = '(pk)' in type_str
     is_fk = '(fk' in type_str
     auto_generated = _is_auto_pk(type_str)
+
+    fk_ref = _parse_fk_reference(type_str) if is_fk else None
 
     meta = {
         'name': field_name,
@@ -78,22 +141,31 @@ def _build_input_meta(field_name, type_str):
         'is_pk': is_pk,
         'is_fk': is_fk,
         'auto_generated': auto_generated,
+        
         # Auto-generated PKs are NOT required on input (DB fills them)
-        'required': is_pk and not auto_generated,
+        'required': not is_pk,
         'input_type': 'text',
         'step': None,
+        'fk_options': [],
     }
-
-    if base_type == 'int':
-        meta['input_type'] = 'number'
-        meta['step'] = '1'
-    elif base_type == 'float':
-        meta['input_type'] = 'number'
-        meta['step'] = 'any'
-    elif base_type == 'date':
-        meta['input_type'] = 'date'
-    elif base_type == 'bool':
-        meta['input_type'] = 'checkbox'
+    if fk_ref and schema:
+        ref_table, ref_column = fk_ref
+        meta['fk_options'] = _get_fk_options(ref_table, ref_column, schema)
+        meta['fk_ref_table'] = ref_table
+        meta['fk_ref_column'] = ref_column
+        if meta['fk_options']:
+            meta['input_type'] = 'select'
+    if meta['input_type'] != 'select':
+        if base_type == 'int':
+            meta['input_type'] = 'number'
+            meta['step'] = '1'
+        elif base_type == 'float':
+            meta['input_type'] = 'number'
+            meta['step'] = 'any'
+        elif base_type == 'date':
+            meta['input_type'] = 'date'
+        elif base_type == 'bool':
+            meta['input_type'] = 'checkbox'
 
     return meta
 
@@ -159,7 +231,9 @@ def _insert_row(table_name, table_fields, incoming_data, from_csv=False):
     errors = []
 
     for field_name, type_str in table_fields.items():
-        auto_pk = _is_auto_pk(type_str)
+
+        if _is_auto_pk(type_str): 
+            continue
 
         if _parse_base_type(type_str) == 'bool':
             raw_value = incoming_data.get(field_name)
@@ -167,15 +241,6 @@ def _insert_row(table_name, table_fields, incoming_data, from_csv=False):
             raw_value = incoming_data.get(field_name, '')
             if raw_value is not None:
                 raw_value = str(raw_value).strip()
-
-        # Auto-generated PK with no value: skip → DB generates it.
-        if auto_pk and (raw_value is None or raw_value == ''):
-            continue
-
-        # Manual PK (e.g. string PK) must be supplied.
-        if '(pk)' in type_str and not auto_pk and (raw_value is None or raw_value == ''):
-            errors.append(f'{field_name} is required.')
-            continue
 
         try:
             coerced = _coerce_value(raw_value, type_str, from_csv=from_csv)
@@ -295,7 +360,8 @@ def table_add_entry(request, table_name):
         return redirect('datasets:list')
 
     table_fields = schema[table_name]
-    all_fields_meta = [_build_input_meta(n, t) for n, t in table_fields.items()]
+    all_fields_meta = [_build_input_meta(n, t, schema=schema) for n, t in table_fields.items()]
+    
     # Hide auto-generated PKs from the form entirely.
     visible_fields = [f for f in all_fields_meta if not f['auto_generated']]
     auto_pk_fields = [f['name'] for f in all_fields_meta if f['auto_generated']]
@@ -342,7 +408,7 @@ def table_add_bulk(request, table_name):
     table_fields = schema[table_name]
     expected_headers = list(table_fields.keys())
 
-    fields_meta = [_build_input_meta(n, t) for n, t in table_fields.items()]
+    fields_meta = [_build_input_meta(n, t, schema=schema)  for n, t in table_fields.items()]
 
     if request.method == 'POST':
         bulk_data_raw = request.POST.get('bulk_data')

@@ -1,6 +1,5 @@
 import json
 import os
-import traceback
 import jsonschema
 
 from django.conf import settings
@@ -9,14 +8,18 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from django.db import connection
+from django.urls import reverse
 
-from .models import Schema, SchemaVersion, SchemaAuditLog
+from .models import Schema, SchemaVersion, SchemaAuditLog, SchemaSnapshot
 from .forms import SchemaForm, SchemaVersionForm
 
 from apps.core.models import AuditLog
-from apps.accounts.permissions import non_guest_required
+from apps.accounts.permissions import non_guest_required, user_is_guest
 
 SCHEMA_FILE = os.path.join(settings.BASE_DIR, 'Schema.json')
+
+# How many recent snapshots to surface in the "Revert" panel
+REVERT_PANEL_LIMIT = 3
 
 # Type mapping from Schema.json types to PostgreSQL types
 TYPE_MAP = {
@@ -85,6 +88,33 @@ def extract_foreign_keys(fields):
     return fks
 
 
+# ────────────────────────────────────────────────────────────
+# Helper: build the Keycloak admin console URL from OIDC settings.
+# Browser-facing — uses the issuer the user's browser can reach.
+# ────────────────────────────────────────────────────────────
+def _keycloak_admin_url():
+    """
+    Return the Keycloak admin console URL the browser should open.
+
+    Derived from OIDC_ISSUER in settings — for example
+    "http://localhost:8080/realms/prism" -> "http://localhost:8080/admin/".
+    Returns None if OIDC is disabled or the issuer cannot be parsed.
+    """
+    if getattr(settings, 'DISABLE_OIDC', True):
+        return None
+
+    issuer = os.environ.get('OIDC_ISSUER', '')
+    if not issuer:
+        return None
+
+    # Strip "/realms/<name>" suffix to get the base Keycloak host.
+    base = issuer.split('/realms/')[0].rstrip('/')
+    if not base:
+        return None
+
+    return f"{base}/admin/"
+
+
 @login_required
 def schema_list(request):
     """Schema page — edit Schema.json and initialize database."""
@@ -93,9 +123,26 @@ def schema_list(request):
         with open(SCHEMA_FILE, 'r', encoding='utf-8') as f:
             schema_content = f.read()
 
+    # If the user just clicked a "Revert" link, the staged content
+    # for that snapshot is in the session — load it into the editor
+    # instead of the on-disk file. The session is then cleared so a
+    # page refresh shows the on-disk content again.
+    staged_revert = request.session.pop('schema_staged_revert', None)
+    if staged_revert:
+        schema_content = staged_revert.get('content', schema_content)
+        messages.info(
+            request,
+            f"Loaded snapshot from {staged_revert.get('saved_at_label', 'earlier')}. "
+            f"Click Save to apply, or refresh to discard."
+        )
+
+    snapshots = SchemaSnapshot.objects.all()[:REVERT_PANEL_LIMIT]
+
     context = {
         'page_title': 'Schema Registry',
         'schema_content': schema_content,
+        'snapshots': snapshots,
+        'keycloak_admin_url': _keycloak_admin_url(),
     }
     return render(request, 'schemas/list.html', context)
 
@@ -103,23 +150,71 @@ def schema_list(request):
 @login_required
 @non_guest_required
 def save_schema(request):
-    """Save edited Schema.json content to disk."""
+    """
+    Save edited Schema.json content to disk AND record a snapshot
+    so the user can revert to this point later.
+    """
     if request.method == 'POST':
         content = request.POST.get('schema_content', '')
+
+        # Validate JSON before doing anything destructive.
         try:
             json.loads(content)
-            with open(SCHEMA_FILE, 'w', encoding='utf-8') as f:
-                f.write(content)
-            messages.success(request, 'Schema.json saved successfully.')
-
-            AuditLog.objects.create(
-                user=request.user,
-                action='save_schema',
-                model_name='Schema.json',
-                object_id='Schema.json',
-            )
         except json.JSONDecodeError as e:
             messages.error(request, f'Invalid JSON — not saved. Error: {e}')
+            return redirect('schemas:list')
+
+        # Write to disk.
+        with open(SCHEMA_FILE, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+        # Record a snapshot, but only if it actually differs from the
+        # most recent one — saving the same content twice is just noise.
+        latest = SchemaSnapshot.objects.first()
+        if latest is None or latest.content != content:
+            SchemaSnapshot.objects.create(
+                content=content,
+                saved_by=request.user,
+            )
+
+        messages.success(request, 'Schema.json saved successfully.')
+
+        AuditLog.objects.create(
+            user=request.user,
+            action='save_schema',
+            model_name='Schema.json',
+            object_id='Schema.json',
+        )
+
+    return redirect('schemas:list')
+
+
+@login_required
+@non_guest_required
+def revert_schema(request, snapshot_id):
+    """
+    Stage an older snapshot for review.
+
+    We DO NOT overwrite Schema.json here. Instead the snapshot content is
+    placed in the session, and the next render of the Schema Registry page
+    pre-fills the editor with that content. The user must then click Save
+    to actually apply it. This makes revert a non-destructive action.
+    """
+    snapshot = get_object_or_404(SchemaSnapshot, pk=snapshot_id)
+
+    request.session['schema_staged_revert'] = {
+        'content': snapshot.content,
+        'saved_at_label': snapshot.saved_at.strftime('%d/%m/%Y %I:%M %p'),
+        'snapshot_id': snapshot.pk,
+    }
+
+    AuditLog.objects.create(
+        user=request.user,
+        action='stage_revert',
+        model_name='Schema.json',
+        object_id=str(snapshot.pk),
+    )
+
     return redirect('schemas:list')
 
 
@@ -229,7 +324,6 @@ def version_create(request, schema_pk):
             version.created_by = request.user
 
             try:
-                import jsonschema
                 jsonschema.Draft202012Validator.check_schema(version.json_schema)
                 version.save()
 

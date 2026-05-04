@@ -1,5 +1,40 @@
 {% extends 'base.html' %}
 
+{% block page_actions %}
+<div class="d-flex align-items-start gap-3">
+    {% if snapshots %}
+    <div class="text-end">
+        <div class="fw-bold text-warning small mb-1" style="text-decoration: underline;">
+            Revert to older Schema:
+        </div>
+        <ul class="list-unstyled small mb-0">
+            {% for snap in snapshots %}
+            <li>
+                <a href="{% url 'schemas:revert_schema' snap.pk %}"
+                   class="text-warning"
+                   onclick="return confirm('Load the snapshot from {{ snap.saved_at|date:"d/m/Y g:i A" }} into the editor?\n\nNothing will be saved until you click Save again.');">
+                    &mdash; {{ snap.saved_at|date:"d/m/Y g:i A" }}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="d-flex flex-column gap-2">
+        {% if keycloak_admin_url and not is_guest %}
+        <a href="{{ keycloak_admin_url }}"
+           target="_blank"
+           rel="noopener"
+           class="btn btn-outline-warning btn-sm">
+            <i class="bi bi-box-arrow-up-right"></i>
+            Log into Keycloak admin portal
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
 {% block content %}
 {% if is_guest %}
 <div class="alert alert-warning small">

@@ -1,6 +1,9 @@
 import json
 import os
 import jsonschema
+import csv
+import io
+import re
 
 from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
@@ -30,6 +33,31 @@ TYPE_MAP = {
     "date": "DATE",
 }
 
+def _looks_like_int(value):
+    try:
+        int(str(value).strip())
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
+def _looks_like_float(value):
+    try:
+        float(str(value).strip())
+        return True
+    except (ValueError, TypeError):
+        return False
+
+def infer_type(value):
+    try:
+        int(value)
+        return "int"
+    except:
+        try:
+            float(value)
+            return "float"
+        except:
+            return "string"
 
 def _autoincrement_pk_sql():
     """
@@ -370,3 +398,134 @@ def version_approve(request, pk):
         return redirect('schemas:detail', pk=version.schema.pk)
 
     return redirect('schemas:detail', pk=version.schema.pk)
+
+
+@login_required
+@non_guest_required
+def create_schema_from_csv(request):
+    if request.method != "POST":
+        return redirect('schemas:list')
+
+    csv_file = request.FILES.get("csv_file")
+    if not csv_file:
+        messages.error(request, "No CSV file uploaded.")
+        return redirect('schemas:list')
+
+    try:
+        decoded = csv_file.read().decode("utf-8-sig")
+        reader = csv.DictReader(io.StringIO(decoded))
+        rows = list(reader)
+
+        if not reader.fieldnames:
+            messages.error(request, "CSV has no header row.")
+            return redirect('schemas:list')
+
+        if not rows:
+            messages.error(request, "CSV is empty.")
+            return redirect('schemas:list')
+
+        table_name = re.sub(r'\W+', '_', os.path.splitext(csv_file.name)[0]).lower()
+
+        # Check DB table already exists
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = %s
+                )
+                """,
+                [table_name],
+            )
+            table_exists = cur.fetchone()[0]
+
+        if table_exists:
+            messages.error(
+                request,
+                f'Table "{table_name}" already exists. Please use a different CSV name or remove the existing table first.'
+            )
+            return redirect('schemas:list')
+
+        # Load Schema.json
+        if os.path.exists(SCHEMA_FILE):
+            with open(SCHEMA_FILE, 'r', encoding='utf-8') as f:
+                schema = json.load(f)
+        else:
+            schema = {}
+
+        if table_name in schema:
+            messages.error(
+                request,
+                f'Schema "{table_name}" already exists in Schema.json.'
+            )
+            return redirect('schemas:list')
+
+        # Infer columns
+        columns = {}
+
+        for col in reader.fieldnames:
+            safe_col = re.sub(r'\W+', '_', col).strip('_')
+            if not safe_col:
+                continue
+
+            sample_values = [
+                row.get(col, "")
+                for row in rows[:20]
+                if row.get(col, "") not in ("", None)
+            ]
+
+            if not sample_values:
+                inferred = "string"
+            elif all(_looks_like_int(v) for v in sample_values):
+                inferred = "int"
+            elif all(_looks_like_float(v) for v in sample_values):
+                inferred = "float"
+            else:
+                inferred = "string"
+
+            columns[safe_col] = inferred
+
+        # Add auto primary key
+        pk_name = f"{table_name}_id"
+        columns = {pk_name: "int (pk)", **columns}
+
+        # Update Schema.json
+        schema[table_name] = columns
+
+        with open(SCHEMA_FILE, 'w', encoding='utf-8') as f:
+            json.dump(schema, f, indent=2)
+
+        # Create DB table
+        with connection.cursor() as cur:
+            column_defs = []
+            for col_name, type_str in columns.items():
+                column_defs.append(f'"{col_name}" {parse_type(type_str)}')
+
+            create_stmt = (
+                f'CREATE TABLE "{table_name}" (\n  '
+                + ',\n  '.join(column_defs)
+                + '\n);'
+            )
+            cur.execute(create_stmt)
+
+        messages.success(
+            request,
+            f'Table "{table_name}" created from CSV and added to Schema.json.'
+        )
+
+        AuditLog.objects.create(
+            user=request.user,
+            action="create_schema_from_csv",
+            model_name=table_name,
+            object_id=table_name,
+        )
+
+    except UnicodeDecodeError:
+        messages.error(request, "Could not read CSV file. Please check the file encoding.")
+    except json.JSONDecodeError as e:
+        messages.error(request, f"Schema.json is invalid JSON: {e}")
+    except Exception as e:
+        messages.error(request, f"Failed to create schema from CSV: {e}")
+
+    return redirect('schemas:list')

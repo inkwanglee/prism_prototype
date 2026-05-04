@@ -52,6 +52,16 @@
     </form>
 </div>
 
+<div class="mb-3">
+    <form method="post" action="{% url 'schemas:create_from_csv' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="csv_file" accept=".csv" required {% if is_guest %}disabled{% endif %}>
+        <button type="submit" class="btn btn-primary" {% if is_guest %}disabled{% endif %}>
+            <i class="bi bi-upload"></i> Create schema from CSV
+        </button>
+    </form>
+</div>
+
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-filetype-json"></i> Schema.json</h5>

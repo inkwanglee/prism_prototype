@@ -1,5 +1,5 @@
 {
-  "Collars_test": {
+  "Collars_test1": {
     "CollarID": "int (pk)",
     "Current_EPM": "string",
     "Year_Report": "int",
@@ -98,5 +98,37 @@
   "DrillCompany": {
     "DrillCompanyID": "int (pk)",
     "DrillCompany": "string"
+  },
+  "historic_waroo_drillhole_data": {
+    "historic_waroo_drillhole_data_id": "int (pk)",
+    "Current_EPM": "string",
+    "Year_Report": "int",
+    "CompanyReport": "string",
+    "Company": "string",
+    "Original_EPM": "string",
+    "Type": "string",
+    "HOLEID": "string",
+    "HoleID_Original": "string",
+    "GRID": "string",
+    "MGA94_East": "string",
+    "MGA94_North": "string",
+    "Elevation": "float",
+    "RL_Comment": "string",
+    "Coordinate_comment": "string",
+    "Total_Depth": "float",
+    "Dip": "int",
+    "Azimuth_TN": "int",
+    "Azimuth_Mag": "int",
+    "Original_Azi_reported": "string",
+    "Comments": "string",
+    "Drill_Company": "string",
+    "Date_Commenced": "string",
+    "Date_Completed": "string",
+    "Traverse": "string",
+    "AMG84_East": "string",
+    "AMG84_North": "string",
+    "AMG84_RL": "float",
+    "Local_EW": "string",
+    "Local_NS": "string"
   }
 }

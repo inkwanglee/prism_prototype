@@ -13,4 +13,5 @@ urlpatterns = [
     path('<int:schema_pk>/version/create/', views.version_create, name='version_create'),
     path('version/<int:pk>/approve/', views.version_approve, name='version_approve'),
     path('create-from-csv/', views.create_schema_from_csv, name='create_from_csv'),
+    path('delete-table/', views.delete_schema_table, name='delete_schema_table'),
 ]

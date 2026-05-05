@@ -529,3 +529,45 @@ def create_schema_from_csv(request):
         messages.error(request, f"Failed to create schema from CSV: {e}")
 
     return redirect('schemas:list')
+
+@login_required
+@non_guest_required
+def delete_schema_table(request):
+    if request.method == "POST":
+        table_name = request.POST.get("table_name", "").strip()
+
+        if not table_name:
+            messages.error(request, "Please enter a table name.")
+            return redirect("schemas:list")
+
+        try:
+            with open(SCHEMA_FILE, "r", encoding="utf-8") as f:
+                schema = json.load(f)
+
+            if table_name not in schema:
+                messages.error(request, f'"{table_name}" was not found in Schema.json.')
+                return redirect("schemas:list")
+
+            # Remove from Schema.json
+            del schema[table_name]
+
+            with open(SCHEMA_FILE, "w", encoding="utf-8") as f:
+                json.dump(schema, f, indent=2)
+
+            # Optional: also drop DB table
+            with connection.cursor() as cur:
+                cur.execute(f'DROP TABLE IF EXISTS "{table_name}"')
+
+            AuditLog.objects.create(
+                user=request.user,
+                action="delete_schema_table",
+                model_name=table_name,
+                object_id=table_name,
+            )
+
+            messages.success(request, f'Table "{table_name}" deleted from Schema.json and database.')
+
+        except Exception as e:
+            messages.error(request, f"Failed to delete schema table: {e}")
+
+    return redirect("schemas:list")

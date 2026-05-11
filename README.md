@@ -1,239 +1,157 @@
-# PRISM - Platform for Resource Intelligence & Subsurface Management
+# PRISM — Platform for Resource Intelligence & Subsurface Management
 
-Sprint 1 MVP Implementation - Django-based Geological Data Management Platform
+**Sprint 1 – Sprint 4 (March 2026 – May 2026)**
 
-## Key Features
+A Django-based geological data management platform built for the resources sector. PRISM is the foundation layer of a broader two-database strategy: it handles **ExploreDB** workloads — the messy, heterogeneous, research and evaluation side of mining data — including spatial datasets, drillhole assays, schema management, and collaborative curation.
 
-### Implemented Features (Sprint 1)
+---
 
-- **Authentication System**: Django built-in authentication (OIDC can be disabled in development)
-- **Schema Registry**: JSON Schema-based data schema management
-  - Schema creation and version management
-  - Version-specific approval workflow
-  - JSON Schema validation
-- **Dataset Catalog**: Dataset registration and management
-  - Schema reference-based datasets
-  - Filtering and search capabilities
-- **Ingestion**: Data collection job tracking (basic structure)
-- **QAQC**: Quality assurance dashboard (basic structure)
-- **Lineage**: Data lineage tracking (basic structure)
-- **REST API**: OpenAPI documented API
-- **Admin Panel**: Data management through Django Admin
+## PROJECT OVERVIEW
 
-## Getting Started
+The project scope for this iteration covered:
 
-### Prerequisites
+* **Schema Registry** — a Schema.json-driven control surface where authorised users can edit, save, version, and revert the data model that backs every dataset table.
+* **Dataset Catalog** — browsable views over the schema-defined tables with single-row Add, Edit, Delete, and Bulk CSV import paths.
+* **Auto-generated primary keys** for `int (pk)` columns (Postgres `SERIAL` / SQLite `AUTOINCREMENT`) so users never input IDs manually.
+* **SSO via Keycloak (OIDC)** with seven functional roles plus a read-only **guest** role enforced by `@non_guest_required` and an `is_guest` template flag.
+* **CSV-based schema creation and deletion** so new tables can be onboarded without code changes.
+* **Schema snapshots and non-destructive revert** so accidental schema edits can be recovered safely.
 
-- Python 3.11+
-- Docker & Docker Compose
-- Poetry (Python package manager)
+### Links
 
-### Quick Start
+* **Demo Video:** _(to be added — record before final handover)_
+* **Notion workspace:** _(to be added — internal team workspace)_
+* **Repository:** `https://github.com/inkwanglee/prism_prototype`
 
-```bash
-# 1. Clone the repository
-git clone <your-repo>
-cd prism
+---
 
-# 2. Install dependencies and setup
-chmod +x scripts/setup.sh
-./scripts/setup.sh
+## SET UP INSTRUCTIONS
 
-# 3. Start development server
-poetry run python manage.py runserver
+### Project structure
 
-# Or start all services with Docker Compose
-docker compose up
-```
-
-### Access Information
-
-- **Web Application**: http://localhost:8000
-- **Admin Panel**: http://localhost:8000/admin/
-  - Username: `admin`
-  - Password: `admin123`
-- **API Documentation**: http://localhost:8000/api/schema/docs/
-- **Keycloak Admin**: http://localhost:8080 (admin/admin)
-- **MinIO Console**: http://localhost:9001 (minio/minio123)
-
-### Creating Demo Data
-
-```bash
-poetry run python scripts/create-demo-data.py
-```
-
-## Project Structure
+PRISM uses Django's **multi-app** layout rather than the single-app structure shown in the handover template. Each functional area is its own Django app, so future teams can extend one without touching the others.
 
 ```
-prism/
+prism_prototype/
 ├── manage.py
 ├── docker-compose.yml
-├── Dockerfile
-├── pyproject.toml
-├── .env.dev
-├── prism_site/           # Django project settings
+├── Dockerfile, Dockerfile.web, Dockerfile.keycloak
+├── pyproject.toml              # Poetry dependencies (acts as the requirements file)
+├── .env.dev                    # Development environment variables
+├── Schema.json                 # Source of truth for all dataset tables
+├── prism_site/                 # Django project settings
 │   ├── settings.py
 │   ├── urls.py
 │   ├── wsgi.py
 │   └── celery.py
-├── apps/                 # Django applications
-│   ├── core/            # Core functionality (home, health check)
-│   ├── accounts/        # User authentication
-│   ├── schemas/         # Schema registry
-│   ├── datasets/        # Dataset catalog
-│   ├── ingestion/       # Data ingestion
-│   ├── qaqc/           # Quality assurance
-│   └── lineage/        # Data lineage
-├── templates/           # HTML templates
-├── static/             # Static files
-└── scripts/            # Utility scripts
+├── apps/                       # Functional apps
+│   ├── core/                   # Home dashboard, health check, audit log
+│   ├── accounts/               # OIDC backend, guest permissions, login
+│   ├── schemas/                # Schema.json editor, snapshots, CSV create
+│   ├── datasets/               # Browse, add, edit, delete dataset rows
+│   ├── qaqc/                   # Quality-assurance dashboards (skeleton)
+│   └── lineage/                # Data lineage view (skeleton)
+├── templates/                  # HTML templates, one folder per app
+├── static/                     # CSS, JS, images
+├── keycloak/
+│   └── prism-realm.json        # Realm import — roles, users, OIDC client
+└── scripts/                    # setup.sh, start-web.sh, create-demo-data.py
 ```
 
-## Development Workflow
+### Additional packages
 
-### Creating and Applying Migrations
+All Python dependencies are pinned in `pyproject.toml` (Poetry). Notable additions beyond a stock Django install:
+
+| Package | Why |
+|---|---|
+| `mozilla-django-oidc` | Keycloak SSO integration |
+| `python-jose[cryptography]` | JWT signing / verification used by the OIDC backend |
+| `psycopg[binary]` | PostgreSQL driver |
+| `django-redis`, `redis`, `celery` | Cache, broker, and async task workers |
+| `django-environ` | `.env` file loader |
+| `whitenoise` | Static file serving in containers |
+| `drf-spectacular`, `drf-spectacular-sidecar` | OpenAPI schema + Swagger UI |
+| `django-htmx`, `django-prometheus` | Progressive enhancement and Prometheus metrics |
+| `crispy-bootstrap5`, `django-crispy-forms` | Bootstrap 5 form rendering |
+| `jsonschema`, `semver` | Schema version validation |
+| `pandas`, `numpy`, `scipy` | Tabular and numeric processing |
+| `paramiko` | SFTP client (reserved for future LIMS connector) |
+| `reportlab` | PDF generation (reserved for future report packs) |
+
+### Installation procedure
+
+**Installation procedure same as before** — the project ships with `docker-compose.yml` and a `scripts/setup.sh` bootstrapper, so the whole stack (web, database, Redis, MinIO, Keycloak) comes up with a single command. The long-form walk-through is in `QUICKSTART.md` in the repo root.
+
+In short:
 
 ```bash
-poetry run python manage.py makemigrations
-poetry run python manage.py migrate
+git clone https://github.com/inkwanglee/prism_prototype.git
+cd prism_prototype
+docker compose up --build       # First time, or after pulling new code
 ```
 
-### Running Tests
+Once the containers report healthy:
 
-```bash
-poetry run pytest
-```
+| Service | URL | Credentials |
+|---|---|---|
+| Web app | http://localhost:8000 | sign in via Keycloak |
+| Keycloak admin | http://localhost:8080/admin/ | admin / admin |
+| MinIO console | http://localhost:9001/ | minio / minio123 |
+| API docs | http://localhost:8000/api/schema/docs/ | (after sign-in) |
 
-### Code Formatting
+Three Keycloak users are seeded by `keycloak/prism-realm.json`:
 
-```bash
-poetry run black .
-poetry run isort .
-poetry run flake8 .
-```
+| Username | Password | Role | Notes |
+|---|---|---|---|
+| `orefox1` | `test1234` | `data_steward` | Full access |
+| `orefox2` | `test1234` | `data_steward` | Full access |
+| `guest` | `guest123` | `guest` | Read-only |
 
-### Starting Celery Worker
+### Common installation errors
 
-```bash
-poetry run celery -A prism_site worker -l info
-```
+| Symptom | Cause / fix |
+|---|---|
+| `port is already allocated` on `docker compose up` | Stop any local Postgres / Redis / Keycloak running on host ports 5432 / 6379 / 8080. |
+| Login loops back to Keycloak | The `OIDC_ISSUER` URL inside the web container doesn't match the one your browser hits. Check both `OIDC_ISSUER` (browser-facing) and `OIDC_ISSUER_INTERNAL` (Docker-internal) in `docker-compose.yml`. |
+| Old realm users still appear after seeding new ones | Realm import only runs on first start. Wipe the Keycloak volume with `docker compose down -v` and bring the stack back up. |
+| New Django migrations not applied | `docker compose exec web python manage.py migrate` then `docker compose restart web`. |
+| "Schema.json not found" on Initialize Database | Save the editor contents once (Schemas page → Save) before clicking Initialize. |
 
-## API Usage Examples
+---
 
-### Register a Schema
+## IMPORTANT NOTES
 
-```bash
-curl -X POST http://localhost:8000/api/schemas/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "key": "drillhole.assay",
-    "owner": "Exploration Team",
-    "description": "Assay results schema"
-  }'
-```
+### Changes to existing code
 
-### Validate Payload
+The most significant changes this team introduced beyond the original Sprint 1 scaffold:
 
-```bash
-curl -X POST http://localhost:8000/api/schemas/validate/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "schema_ref": "drillhole.collar@0.1.0",
-    "payload": {
-      "hole_id": "DH001",
-      "x": 123.45,
-      "y": 678.90,
-      "z": 100.0
-    }
-  }'
-```
+* **Schema-driven dynamic tables.** `apps/datasets/views.py` and `apps/schemas/views.py` issue raw SQL against tables declared in `Schema.json`, so adding or removing entries in that file flows straight through to the database (after Initialize Database). All raw SQL goes through `_quote_ident` to prevent SQL injection through table or column names.
+* **Auto-increment primary keys.** `int (pk)` columns become `SERIAL PRIMARY KEY` on Postgres / `INTEGER PRIMARY KEY AUTOINCREMENT` on SQLite. The Add Entry form hides these columns entirely so users can't fight the database for the next ID.
+* **Guest role infrastructure.** A reusable `@non_guest_required` decorator plus an `is_guest` template flag, both backed by Keycloak claims with a Django Group fallback for non-OIDC dev setups.
+* **Schema snapshot / revert.** Every Save records a `SchemaSnapshot` row when content changes. Reverts are non-destructive — they stage content in the user's session until a fresh Save is clicked.
+* **Keycloak admin shortcut.** A header button on the Schemas page opens the Keycloak admin console in a new tab; the URL is derived dynamically from `OIDC_ISSUER` so it works across local, staging, and production.
+* **CSV-driven schema creation and deletion.** Upload any CSV on the Schemas page to infer column types and create both the Schema.json entry and the matching DB table; the delete form drops both together.
+* **Edit-row UI for dataset tables.** `apps/datasets/views.py:table_edit_entry` plus the matching template let users update individual rows via the same input metadata (`_build_input_meta`) used by Add Entry.
 
-## Environment Variables
+### Incomplete components
 
-Configure the following environment variables in the `.env.dev` file:
+These exist as scaffolds for the next team to flesh out:
 
-```bash
-# Django
-DJANGO_SECRET_KEY=your-secret-key
-DJANGO_DEBUG=True
+* **`apps/qaqc/`** — model and dashboard skeleton only. The next team is expected to implement the actual data quality checks (negative values, interval sanity, overlap detection, standards z-scores) and wire them into the ingestion pipeline.
+* **`apps/lineage/`** — `Snapshot` and `LineageEdge` models exist but nothing emits edges automatically. The full lineage graph UI (upstream / downstream traversal, snapshot diffing) is unbuilt.
+* **`apps/ingestion/`** — files remain in the repo but the app is **NOT** in `INSTALLED_APPS` and has no URL route. Treat it as dead code; remove or reactivate as needed.
+* **API endpoints under `/api/schemas/` and `/api/datasets/`** — OpenAPI-documented but only minimally exercised. Tests and pagination polish are still owed.
+* **Demo data script** — `scripts/create-demo-data.py` seeds the legacy `Schema` / `SchemaVersion` models but does NOT populate the dynamic Schema.json-driven tables. A future team should add a flag to seed sample collars / assays for end-to-end demos.
 
-# Database
-DATABASE_URL=postgres://prism:prism@localhost:5432/prism
+### Important information for the next team
 
-# Redis
-REDIS_URL=redis://redis:6379/0
+1. **Schema.json is the source of truth.** Add a column to the JSON, click Save, then click Initialize Database. Do not bypass this loop with raw migrations — the dynamic SQL paths in `datasets/views.py` will silently miss any column that is in the database but not in `Schema.json`.
+2. **`CREATE TABLE IF NOT EXISTS` does not modify existing tables.** Changing an `int` column to `int (pk)` will only take effect on a freshly-created table. The supported way to apply such a change is to drop the table (Delete schema table button on the Schemas page) and re-create it.
+3. **Guest accounts must stay read-only.** Every new write view must compose `@login_required` with `@non_guest_required` (from `apps.accounts.permissions`) and every new write button must be wrapped in `{% if not is_guest %}` in its template. The pattern is already applied across the codebase — please continue it.
+4. **Keycloak realm changes need a volume wipe.** Edits to `keycloak/prism-realm.json` only re-import on a fresh volume, so users testing realm changes locally need `docker compose down -v` followed by `docker compose up`. Communicate this in advance whenever you ship a realm change — it also wipes the Postgres volume.
+5. **All raw SQL must go through `_quote_ident`.** Never interpolate table or column names from user input (or from Schema.json, which is editable in-app) into SQL strings directly. The helper is in both `apps/datasets/views.py` and `apps/core/views.py`.
+6. **Code is now commented throughout.** When you add new code, follow the same convention — `#` comment block above every module and function explaining intent and any non-obvious behaviour, plus inline `#` comments for tricky lines. Docstrings (`"""..."""`) were intentionally avoided in favour of plain `#` comments for consistency.
 
-# MinIO
-MINIO_ENDPOINT=http://minio:9000
-MINIO_ACCESS_KEY=minio
-MINIO_SECRET_KEY=minio123
+---
 
-# OIDC (optional)
-DISABLE_OIDC=True
-OIDC_ISSUER=http://keycloak:8080/realms/prism
-OIDC_CLIENT_ID=prism-web
-OIDC_CLIENT_SECRET=devsecret
-```
-
-## Thursday Demo Preparation Checklist
-
-- [x] Docker Compose configuration
-- [x] Django project basic structure
-- [x] User authentication (development mode)
-- [x] Schema registry CRUD
-- [x] Dataset catalog CRUD
-- [x] Bootstrap 5 UI
-- [x] REST API with OpenAPI
-- [x] Admin panel
-- [x] Demo data generation script
-- [ ] Presentation materials
-
-## Next Steps (Sprint 2+)
-
-- JSON Schema compatibility checking
-- Drillhole data model implementation
-- CSV import functionality
-- QAQC validation logic
-- Real-time dashboards
-
-## Troubleshooting
-
-### Port Conflicts
-
-```bash
-# Check ports in use
-lsof -i :8000
-lsof -i :5432
-
-# Restart Docker containers
-docker compose down
-docker compose up -d
-```
-
-### Database Reset
-
-```bash
-docker compose down -v
-docker compose up -d db
-poetry run python manage.py migrate
-```
-
-### Static Files Issues
-
-```bash
-poetry run python manage.py collectstatic --clear --noinput
-```
-
-## License
-
-This project is part of an IT Capstone project.
-
-## Team
-
-- Project team members...
-
-## References
-
-- Django Documentation: https://docs.djangoproject.com/
-- DRF Documentation: https://www.django-rest-framework.org/
-- JSON Schema: https://json-schema.org/
+_Last updated: May 2026_

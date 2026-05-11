@@ -1,3 +1,4 @@
+{# Legacy Dataset create/edit form. Crispy renders the whole form including the submit button. #}
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
 
@@ -6,6 +7,7 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-body">
+                {# crispy form helper renders the form fields with Bootstrap 5 markup. #}
                 {% crispy form %}
             </div>
         </div>

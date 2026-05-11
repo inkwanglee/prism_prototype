@@ -1,7 +1,13 @@
+# =============================================================================
+# Forms for the legacy Datasets catalog (used by Django Admin and the
+# legacy detail page only — the Schema.json-driven UI does not use this).
+# =============================================================================
+
 from django import forms
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 from .models import Dataset
+
 
 class DatasetForm(forms.ModelForm):
     class Meta:
@@ -11,11 +17,13 @@ class DatasetForm(forms.ModelForm):
             'description': forms.Textarea(attrs={'rows': 3}),
         }
         help_texts = {
+            # Schema reference uses the "<key>@<version>" syntax.
             'schema_ref': 'e.g., drillhole.collar@0.1.0',
         }
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # crispy-forms helper so the template can `{% crispy form %}`.
         self.helper = FormHelper()
         self.helper.form_method = 'post'
         self.helper.add_input(Submit('submit', 'Create Dataset', css_class='btn btn-primary'))

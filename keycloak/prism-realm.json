@@ -24,74 +24,24 @@
   },
   "users": [
     {
-      "username": "geodeskuser",
-      "email": "geodeskuser@prism.dev",
+      "username": "orefox1",
+      "email": "orefox1@prism.dev",
       "emailVerified": true,
       "enabled": true,
-      "firstName": "Alex",
-      "lastName": "GeoDesk",
-      "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
-      "realmRoles": ["geodesK_user"]
-    },
-    {
-      "username": "steward",
-      "email": "steward@prism.dev",
-      "emailVerified": true,
-      "enabled": true,
-      "firstName": "Sarah",
-      "lastName": "Steward",
+      "firstName": "Orefox",
+      "lastName": "User 1",
       "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
       "realmRoles": ["data_steward"]
     },
     {
-      "username": "engineer",
-      "email": "engineer@prism.dev",
+      "username": "orefox2",
+      "email": "orefox2@prism.dev",
       "emailVerified": true,
       "enabled": true,
-      "firstName": "David",
-      "lastName": "Engineer",
+      "firstName": "Orefox",
+      "lastName": "User 2",
       "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
-      "realmRoles": ["data_engineer"]
-    },
-    {
-      "username": "geologist1",
-      "email": "geologist1@prism.dev",
-      "emailVerified": true,
-      "enabled": true,
-      "firstName": "Jane",
-      "lastName": "Doe",
-      "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
-      "realmRoles": ["exploration_geologist"]
-    },
-    {
-      "username": "labeng",
-      "email": "labeng@prism.dev",
-      "emailVerified": true,
-      "enabled": true,
-      "firstName": "Mike",
-      "lastName": "Lab",
-      "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
-      "realmRoles": ["lab_integration_engineer"]
-    },
-    {
-      "username": "sre",
-      "email": "sre@prism.dev",
-      "emailVerified": true,
-      "enabled": true,
-      "firstName": "Chris",
-      "lastName": "Ops",
-      "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
-      "realmRoles": ["platform_sre"]
-    },
-    {
-      "username": "secadmin",
-      "email": "secadmin@prism.dev",
-      "emailVerified": true,
-      "enabled": true,
-      "firstName": "Pat",
-      "lastName": "Security",
-      "credentials": [{ "type": "password", "value": "test1234", "temporary": false }],
-      "realmRoles": ["security_admin"]
+      "realmRoles": ["data_steward"]
     },
     {
       "username": "guest",

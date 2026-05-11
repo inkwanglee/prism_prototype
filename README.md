@@ -1,6 +1,6 @@
 # PRISM — Platform for Resource Intelligence & Subsurface Management
 
-**Sprint 1 – Sprint 4 (March 2026 – May 2026)**
+**Sprint 3 – Sprint 7 (March 2026 – May 2026)**
 
 A Django-based geological data management platform built for the resources sector. PRISM is the foundation layer of a broader two-database strategy: it handles **ExploreDB** workloads — the messy, heterogeneous, research and evaluation side of mining data — including spatial datasets, drillhole assays, schema management, and collaborative curation.
 

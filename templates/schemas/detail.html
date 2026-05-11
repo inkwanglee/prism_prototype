@@ -1,6 +1,9 @@
+{# Legacy Schema detail page — shows Schema info + version list. #}
+{# Editing happens via the version approval form below or the API at /api/schemas/. #}
 {% extends 'base.html' %}
 
 {% block page_actions %}
+{# Add Version button hidden from guests. #}
 {% if not is_guest %}
 <a href="{% url 'schemas:version_create' schema.pk %}" class="btn btn-primary">
     <i class="bi bi-plus-circle"></i> Add Version
@@ -14,6 +17,7 @@
 {% block content %}
 <div class="row">
     <div class="col-md-8">
+        <!-- Schema Information card. -->
         <div class="card mb-4">
             <div class="card-header">
                 <h5 class="mb-0">Schema Information</h5>
@@ -35,6 +39,7 @@
             </div>
         </div>
 
+        <!-- Version list. Each version shows its status badge and an Approve button if it's still in draft. -->
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">Versions</h5>
@@ -48,6 +53,7 @@
                             <div>
                                 <h6 class="mb-1">
                                     Version {{ version.version }}
+                                    {# Status colour comes from the badge-status-* CSS classes in base.html. #}
                                     <span class="badge badge-status-{{ version.status }}">{{ version.get_status_display }}</span>
                                 </h6>
                                 <p class="mb-1 small text-muted">
@@ -61,6 +67,7 @@
                                 {% endif %}
                             </div>
                             <div>
+                                {# Approve button only for draft versions, and never for guests. #}
                                 {% if version.status == 'draft' and not is_guest %}
                                 <form method="post" action="{% url 'schemas:version_approve' version.pk %}" class="d-inline">
                                     {% csrf_token %}
@@ -82,6 +89,7 @@
     </div>
 
     <div class="col-md-4">
+        <!-- Sidebar with quick actions. -->
         <div class="card">
             <div class="card-header">
                 <h6 class="mb-0">Quick Actions</h6>

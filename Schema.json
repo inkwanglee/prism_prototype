@@ -1,4 +1,20 @@
 {
+  "Company": {
+    "CompanyID": "int (pk)",
+    "Company": "string"
+  },
+  "DrillCompany": {
+    "DrillCompanyID": "int (pk)",
+    "DrillCompany": "string"
+  },
+  "Method": {
+    "MethodID": "int (pk)",
+    "Method": "string"
+  },
+  "Laboratory": {
+    "LabID": "int (pk)",
+    "Laboratory": "string"
+  },
   "Collars_test1": {
     "CollarID": "int (pk)",
     "Current_EPM": "string",
@@ -71,7 +87,7 @@
     "Mo_Method": "int (fk to Method.MethodID)",
     "Pt_Method": "int (fk to Method.MethodID)",
     "Pd_Method": "int (fk to Method.MethodID)",
-    "CollarID": "int (fk to Collars_test.CollarID)",
+    "CollarID": "int (fk to Collars_test1.CollarID)",
     "isRetired": "bool"
   },
   "Survey": {
@@ -82,22 +98,6 @@
     "Azimuth_TN": "int",
     "Azimuth_Mag": "int",
     "Azi_Comment": "string"
-  },
-  "Method": {
-    "MethodID": "int (pk)",
-    "Method": "string"
-  },
-  "Laboratory": {
-    "LabID": "int (pk)",
-    "Laboratory": "string"
-  },
-  "Company": {
-    "CompanyID": "int (pk)",
-    "Company": "string"
-  },
-  "DrillCompany": {
-    "DrillCompanyID": "int (pk)",
-    "DrillCompany": "string"
   },
   "historic_waroo_drillhole_data": {
     "historic_waroo_drillhole_data_id": "int (pk)",

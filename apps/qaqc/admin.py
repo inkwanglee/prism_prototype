@@ -1,5 +1,10 @@
+# =============================================================================
+# Django Admin registration for QaqcRun.
+# =============================================================================
+
 from django.contrib import admin
 from .models import QaqcRun
+
 
 @admin.register(QaqcRun)
 class QaqcRunAdmin(admin.ModelAdmin):

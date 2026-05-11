@@ -1,3 +1,4 @@
+{# Single-row Edit form. Pre-filled with current values; PK is read-only. #}
 {% extends 'base.html' %}
 
 {% block page_actions %}
@@ -12,6 +13,7 @@
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">Edit {{ table_name }} Entry</h5>
+                {# Header shows table name and the PK value identifying the row. #}
                 <div class="text-muted small mt-1">
                     Source: Schema.json |
                     Table: {{ table_name }} |
@@ -20,6 +22,7 @@
             </div>
 
             <div class="card-body">
+                {# Reminder that the PK can't be edited from this form. #}
                 <div class="alert alert-info small mb-4">
                     <i class="bi bi-info-circle"></i>
                     The primary key <code>{{ pk_name }}</code> identifies this row and cannot be changed here.
@@ -28,6 +31,7 @@
                 <form method="post">
                     {% csrf_token %}
 
+                    {# Same field-rendering loop as table_add.html, but each field has a `value` for pre-fill. #}
                     {% for field in fields %}
                     <div class="mb-3">
                         <label for="{{ field.name }}" class="form-label">
@@ -43,6 +47,7 @@
                         </label>
 
                         {% if field.input_type == 'checkbox' %}
+                        {# Pre-check the box when the stored value is truthy. #}
                         <div class="form-check">
                             <input
                                 type="checkbox"
@@ -54,6 +59,7 @@
                         </div>
 
                         {% elif field.input_type == 'select' %}
+                        {# FK dropdown — `selected` set on the option matching the current value. #}
                         <select
                             id="{{ field.name }}"
                             name="{{ field.name }}"
@@ -63,6 +69,7 @@
                             <option value="">— Select —</option>
 
                             {% for opt in field.fk_options %}
+                            {# stringformat:"s" ensures numeric PKs and string values compare correctly. #}
                             <option
                                 value="{{ opt.value }}"
                                 {% if opt.value|stringformat:"s" == field.value|stringformat:"s" %}selected{% endif %}
@@ -73,6 +80,7 @@
                         </select>
 
                         {% else %}
+                        {# Plain text/number/date input — pre-fill via the value attribute. #}
                         <input
                             type="{{ field.input_type }}"
                             id="{{ field.name }}"

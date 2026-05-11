@@ -1,3 +1,4 @@
+{# Single-row Add Entry form for one schema table. #}
 {% extends 'base.html' %}
 
 {% block page_actions %}
@@ -17,6 +18,7 @@
                 </div>
             </div>
             <div class="card-body">
+                {# Banner listing auto-generated PK columns so the user knows why they're missing. #}
                 {% if auto_pk_fields %}
                 <div class="alert alert-info small mb-4">
                     <i class="bi bi-info-circle"></i>
@@ -29,6 +31,7 @@
                 <form method="post">
                     {% csrf_token %}
 
+                    {# Loop over visible (non-auto-PK) fields and render the right input control. #}
                     {% for field in fields %}
                     <div class="mb-3">
                         <label for="{{ field.name }}" class="form-label">
@@ -44,6 +47,7 @@
                             {% endif %}
                         </label>
 
+                        {# Input type depends on the field's metadata (built by _build_input_meta). #}
                         {% if field.input_type == 'checkbox' %}
                             <div class="form-check">
                                 <input
@@ -54,6 +58,7 @@
                                 >
                             </div>
                             {% elif field.input_type == 'select' %}
+                            {# Resolved FK dropdown — values come from the referenced table. #}
                             <select
                                 id="{{ field.name }}"
                                 name="{{ field.name }}"
@@ -66,6 +71,7 @@
                                 {% endfor %}
                             </select>
                         {% else %}
+                            {# Default: text / number / date input. Step set for numeric types. #}
                             <input
                                 type="{{ field.input_type }}"
                                 id="{{ field.name }}"

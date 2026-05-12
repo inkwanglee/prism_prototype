@@ -229,11 +229,21 @@ def schema_list(request):
 
     snapshots = SchemaSnapshot.objects.all()[:REVERT_PANEL_LIMIT]
 
+    schema_table_names = []
+
+    try:
+        if schema_content:
+            schema_data = json.loads(schema_content)
+            schema_table_names = sorted(schema_data.keys())
+    except json.JSONDecodeError:
+        schema_table_names = []
+
     context = {
         'page_title': 'Schema Registry',
         'schema_content': schema_content,
         'snapshots': snapshots,
         'keycloak_admin_url': _keycloak_admin_url(),
+        'schema_table_names': schema_table_names,
     }
     return render(request, 'schemas/list.html', context)
 

@@ -76,6 +76,79 @@ def _parse_fk_reference(type_str):
         return match.group(1), match.group(2)
     return None
 
+
+def _get_fk_display_col(ref_table, schema):
+    """Return the first field after the PK in the referenced table (the display column)."""
+    ref_fields = schema.get(ref_table, {})
+    found_pk = False
+    for fname, ftype in ref_fields.items():
+        if '(pk)' in ftype:
+            found_pk = True
+            continue
+        if found_pk:
+            return fname
+    return None
+
+def _resolve_fk_value(raw_value, type_str, schema):
+    """
+    Resolve a FK field value to a valid PK integer.
+
+    - If the value is already a valid integer ID that exists, use it.
+    - If it's a display name that matches an existing record, return that ID.
+    - If it doesn't match anything, create a new record in the referenced
+      table and return the newly generated PK.
+    - Returns the original value unchanged if the FK reference can't be parsed.
+    """
+    if raw_value is None or str(raw_value).strip() == '':
+        return raw_value
+
+    raw_value = str(raw_value).strip()
+    fk_ref = _parse_fk_reference(type_str)
+    if not fk_ref:
+        return raw_value
+
+    ref_table, ref_column = fk_ref
+    if not _table_exists(ref_table):
+        return raw_value
+
+    display_col = _get_fk_display_col(ref_table, schema)
+
+    try:
+        int_val = int(raw_value)
+        with connection.cursor() as cur:
+            cur.execute(
+                f'SELECT {_quote_ident(ref_column)} FROM {_quote_ident(ref_table)} '
+                f'WHERE {_quote_ident(ref_column)} = %s',
+                [int_val],
+            )
+            if cur.fetchone():
+                return int_val
+    except (ValueError, TypeError):
+        pass
+
+    if display_col and _is_safe_identifier(display_col):
+        with connection.cursor() as cur:
+            cur.execute(
+                f'SELECT {_quote_ident(ref_column)} FROM {_quote_ident(ref_table)} '
+                f'WHERE LOWER({_quote_ident(display_col)}) = LOWER(%s) LIMIT 1',
+                [raw_value],
+            )
+            row = cur.fetchone()
+            if row:
+                return row[0]
+
+        with connection.cursor() as cur:
+            cur.execute(
+                f'INSERT INTO {_quote_ident(ref_table)} ({_quote_ident(display_col)}) '
+                f'VALUES (%s) RETURNING {_quote_ident(ref_column)}',
+                [raw_value],
+            )
+            new_id = cur.fetchone()[0]
+            return new_id
+
+    return raw_value
+
+
 def _get_fk_options(ref_table, ref_column, schema):
     """
     Fetch available FK values from the referenced table.
@@ -153,8 +226,8 @@ def _build_input_meta(field_name, type_str, schema=None):
         meta['fk_options'] = _get_fk_options(ref_table, ref_column, schema)
         meta['fk_ref_table'] = ref_table
         meta['fk_ref_column'] = ref_column
-        if meta['fk_options']:
-            meta['input_type'] = 'select'
+        meta['input_type'] = 'select'
+
     if meta['input_type'] != 'select':
         if base_type == 'int':
             meta['input_type'] = 'number'
@@ -216,7 +289,7 @@ def _get_table_columns(table_name):
         return [row[0] for row in cur.fetchall()]
 
 
-def _insert_row(table_name, table_fields, incoming_data, from_csv=False):
+def _insert_row(table_name, table_fields, incoming_data, from_csv=False, schema=None):
     """
     Insert one row into the given table.
 
@@ -241,6 +314,14 @@ def _insert_row(table_name, table_fields, incoming_data, from_csv=False):
             raw_value = incoming_data.get(field_name, '')
             if raw_value is not None:
                 raw_value = str(raw_value).strip()
+
+        # Resolve FK display names to IDs (and auto-create if missing)
+        if schema and '(fk' in type_str and raw_value not in (None, ''):
+            try:
+                raw_value = _resolve_fk_value(raw_value, type_str, schema)
+            except Exception as e:
+                errors.append(f'{field_name}: could not resolve foreign key "{raw_value}" — {e}')
+                continue
 
         try:
             coerced = _coerce_value(raw_value, type_str, from_csv=from_csv)
@@ -418,12 +499,34 @@ def table_view(request, table_name):
         with connection.cursor() as cur:
             cur.execute(f'SELECT * FROM {_quote_ident(table_name)}{order_sql} LIMIT 500')
             raw_rows = cur.fetchall()
-
+        # Build FK lookup maps: for each FK column, map PK → display label
+        table_fields = schema[table_name]
+        fk_maps = {}  # column_index -> {pk_value: display_label}
+        for col_idx, col_name in enumerate(columns):
+            type_str = table_fields.get(col_name, '')
+            fk_ref = _parse_fk_reference(type_str)
+            if fk_ref:
+                ref_table, ref_column = fk_ref
+                display_col = _get_fk_display_col(ref_table, schema)
+                if display_col and _is_safe_identifier(display_col) and _table_exists(ref_table):
+                    try:
+                        with connection.cursor() as cur:
+                            cur.execute(
+                                f'SELECT {_quote_ident(ref_column)}, {_quote_ident(display_col)} '
+                                f'FROM {_quote_ident(ref_table)} LIMIT 1000'
+                            )
+                            fk_maps[col_idx] = {row[0]: row[1] for row in cur.fetchall()}
+                    except Exception:
+                        pass
         rows = []
         pk_index = columns.index(pk_name) if pk_name in columns else None
         for row in raw_rows:
+            display_cells = list(row)
+            for col_idx, lookup in fk_maps.items():
+                if display_cells[col_idx] is not None and display_cells[col_idx] in lookup:
+                    display_cells[col_idx] = lookup[display_cells[col_idx]]
             rows.append({
-                'cells': row,
+                'cells': display_cells,
                 'pk': row[pk_index] if pk_index is not None else None,
             })
 
@@ -464,7 +567,7 @@ def table_add_entry(request, table_name):
 
     if request.method == 'POST':
         try:
-            success, errors = _insert_row(table_name, table_fields, request.POST, from_csv=False)
+            success, errors = _insert_row(table_name, table_fields, request.POST, from_csv=False,  schema=schema)
             if success:
                 messages.success(request, f'Entry added to {table_name}.')
                 AuditLog.objects.create(
@@ -525,7 +628,7 @@ def table_add_bulk(request, table_name):
                             if field_name in row:
                                 normalized[field_name] = row[field_name]
                         try:
-                            success, errors = _insert_row(table_name, table_fields, normalized, from_csv=True)
+                            success, errors = _insert_row(table_name, table_fields, normalized, from_csv=True, schema=schema)
                             if success:
                                 created += 1
                             else:

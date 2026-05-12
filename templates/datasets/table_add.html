@@ -54,17 +54,20 @@
                                 >
                             </div>
                             {% elif field.input_type == 'select' %}
-                            <select
+                            <input
+                                type="text"
                                 id="{{ field.name }}"
                                 name="{{ field.name }}"
-                                class="form-select"
+                                class="form-control"
+                                list="{{ field.name }}_options"
+                                placeholder="Select or type a new value"
                                 {% if field.required %}required{% endif %}
                             >
-                                <option value="">— Select —</option>
+                            <datalist id="{{ field.name }}_options">
                                 {% for opt in field.fk_options %}
-                                    <option value="{{ opt.value }}">{{ opt.label }}</option>
+                                    <option value="{{ opt.label }}">
                                 {% endfor %}
-                            </select>
+                            </datalist>
                         {% else %}
                             <input
                                 type="{{ field.input_type }}"

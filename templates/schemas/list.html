@@ -1,7 +1,13 @@
+{# =================================================================== #}
+{# Schema Registry page — Schema.json editor + Initialize Database +    #}
+{# CSV create/delete forms + snapshot revert panel + Keycloak shortcut. #}
+{# Every write action is hidden / disabled from guests via is_guest.    #}
+{# =================================================================== #}
 {% extends 'base.html' %}
 
 {% block page_actions %}
 <div class="d-flex align-items-start gap-3">
+    {# Recent snapshots — clicking one stages it in the session for review (non-destructive revert). #}
     {% if snapshots %}
     <div class="text-end">
         <div class="fw-bold text-warning small mb-1" style="text-decoration: underline;">
@@ -10,6 +16,7 @@
         <ul class="list-unstyled small mb-0">
             {% for snap in snapshots %}
             <li>
+                {# JS confirm so users don't accidentally overwrite their unsaved edits. #}
                 <a href="{% url 'schemas:revert_schema' snap.pk %}"
                    class="text-warning"
                    onclick="return confirm('Load the snapshot from {{ snap.saved_at|date:"d/m/Y g:i A" }} into the editor?\n\nNothing will be saved until you click Save again.');">
@@ -22,6 +29,7 @@
     {% endif %}
 
     <div class="d-flex flex-column gap-2">
+        {# Keycloak admin shortcut. Only visible when OIDC is enabled AND the user is not a guest. #}
         {% if keycloak_admin_url and not is_guest %}
         <a href="{{ keycloak_admin_url }}"
            target="_blank"
@@ -36,6 +44,7 @@
 {% endblock %}
 
 {% block content %}
+{# Read-only banner for guest accounts. #}
 {% if is_guest %}
 <div class="alert alert-warning small">
     <i class="bi bi-eye"></i>
@@ -43,6 +52,7 @@
 </div>
 {% endif %}
 
+<!-- Initialize Database button. Runs CREATE TABLE IF NOT EXISTS for every entry in Schema.json. -->
 <div class="mb-3">
     <form method="post" action="{% url 'schemas:initialize_db' %}" id="initForm">
         {% csrf_token %}
@@ -52,6 +62,7 @@
     </form>
 </div>
 
+<!-- Create schema from CSV (Tappei's feature). The file is uploaded, parsed, types inferred, and a new table is created. -->
 <div class="mb-3">
     <form method="post" action="{% url 'schemas:create_from_csv' %}" enctype="multipart/form-data">
         {% csrf_token %}
@@ -62,24 +73,40 @@
     </form>
 </div>
 
+<!-- Delete schema table — removes from Schema.json AND drops the DB table. -->
 <div class="mb-3">
-    <form method="post" action="{% url 'schemas:delete_schema_table' %}"
+    <h6>Delete Schema Table</h6>
+
+    <form method="post"
+          action="{% url 'schemas:delete_schema_table' %}"
           onsubmit="return confirm('Are you sure you want to delete this schema table? This will also drop the database table.');">
+
         {% csrf_token %}
-        <div class="d-flex gap-2">
-            <input type="text"
-                   name="table_name"
-                   placeholder="Enter schema table name"
-                   class="form-control"
-                   required
-                   {% if is_guest %}disabled{% endif %}>
-            <button type="submit" class="btn btn-danger" {% if is_guest %}disabled{% endif %}>
-                <i class="bi bi-trash"></i> Delete schema table
-            </button>
-        </div>
+
+        <select name="table_name"
+                class="form-select mb-2"
+                required
+                {% if is_guest %}disabled{% endif %}>
+
+            <option value="">Select a schema table</option>
+
+            {% for table_name in schema_table_names %}
+                <option value="{{ table_name }}">
+                    {{ table_name }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <button type="submit"
+                class="btn btn-danger"
+                {% if is_guest %}disabled{% endif %}>
+            <i class="bi bi-trash"></i>
+            Delete schema table
+        </button>
     </form>
 </div>
 
+<!-- The Schema.json editor textarea. Save button at the top right. Read-only for guests. -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-filetype-json"></i> Schema.json</h5>
@@ -90,6 +117,11 @@
     <div class="card-body p-0">
         <form method="post" action="{% url 'schemas:save_schema' %}" id="schemaForm">
             {% csrf_token %}
+            <!--
+                Monospace + preserved whitespace so JSON formatting is preserved.
+                `tab-size:4` ensures tabs render as 4 spaces visually.
+                When `is_guest` is set, the textarea becomes read-only.
+            -->
             <textarea
                 name="schema_content"
                 id="schemaEditor"
@@ -105,12 +137,14 @@
 
 {% block extra_js %}
 <script>
+    // Programmatic submit handler used by the Save button and Ctrl/Cmd+S below.
     function saveSchema() {
         document.getElementById('schemaForm').submit();
     }
 
+    {# Editor-only behaviours are skipped entirely for guests so they never see them fire. #}
     {% if not is_guest %}
-    // Ctrl+S / Cmd+S to save
+    // Ctrl+S / Cmd+S to save. Prevent the browser's default "Save Page" dialog.
     document.addEventListener('keydown', function(e) {
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
             e.preventDefault();
@@ -118,7 +152,8 @@
         }
     });
 
-    // Tab key inserts a tab character instead of moving focus
+    // Tab key inserts a tab character (4 spaces) instead of moving keyboard focus
+    // out of the textarea — useful when indenting JSON manually.
     document.getElementById('schemaEditor').addEventListener('keydown', function(e) {
         if (e.key === 'Tab') {
             e.preventDefault();
@@ -129,7 +164,7 @@
         }
     });
 
-    // Confirm before initializing
+    // Confirm before initializing — recreating tables in production would be disruptive.
     document.getElementById('initForm').addEventListener('submit', function(e) {
         if (!confirm('This will create/recreate database tables from the current Schema.json. Continue?')) {
             e.preventDefault();

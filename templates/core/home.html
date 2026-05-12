@@ -1,7 +1,12 @@
+{# =============================================================== #}
+{# PRISM dashboard. Schema-table count, total row count, QAQC      #}
+{# status, and a recent-activity feed pulled from AuditLog.        #}
+{# =============================================================== #}
 {% extends 'base.html' %}
 
 {% block content %}
 
+<!-- Welcome banner. Always visible — gives the page a clear intro. -->
 <div class="row">
     <div class="col-md-12">
         <div class="alert alert-info">
@@ -14,9 +19,10 @@
 </div>
 
 <div class="row g-4 mt-2">
-    <!-- Quick Stats -->
+    <!-- Quick Stats: three cards summarising the system at a glance. -->
     <div class="row g-4 mt-2">
     <div class="col-md-4">
+        <!-- Schema tables card — counts entries in Schema.json. -->
         <div class="card">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Schema Tables</h6>
@@ -27,6 +33,7 @@
     </div>
 
     <div class="col-md-4">
+        <!-- Total rows card — sum of COUNT(*) across every schema-driven table. -->
         <div class="card">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">Total Rows</h6>
@@ -37,6 +44,7 @@
     </div>
 
     <div class="col-md-4">
+        <!-- QAQC status card — placeholder for now, always "Healthy". -->
         <div class="card">
             <div class="card-body">
                 <h6 class="card-subtitle mb-2 text-muted">QAQC Status</h6>
@@ -48,6 +56,7 @@
 </div>
 
 
+<!-- Recent activity feed — last 10 AuditLog entries with the actor and timestamp. -->
 <div class="row mt-4">
     <div class="col-md-12">
         <div class="card">

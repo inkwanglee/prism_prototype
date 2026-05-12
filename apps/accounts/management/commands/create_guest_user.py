@@ -1,20 +1,21 @@
-"""
-Management command: create a read-only "guest" user for local development.
+# =============================================================================
+# Management command: create a read-only "guest" user for local development.
+# =============================================================================
+# Usage:
+#     # Create the default guest (guest / guest123)
+#     poetry run python manage.py create_guest_user
+#
+#     # Custom credentials
+#     poetry run python manage.py create_guest_user \
+#         --username guest2 --password secret --email guest2@prism.dev
+#
+#     # Batch-create several guests (guest1, guest2, guest3)
+#     poetry run python manage.py create_guest_user --count 3
+#
+# The command is idempotent: re-running it just resets the password and
+# re-adds the user to the "guest" Group.
+# =============================================================================
 
-Usage:
-    # Create the default guest (guest / guest123)
-    poetry run python manage.py create_guest_user
-
-    # Custom credentials
-    poetry run python manage.py create_guest_user \\
-        --username guest2 --password secret --email guest2@prism.dev
-
-    # Batch-create several guests (guest1, guest2, guest3)
-    poetry run python manage.py create_guest_user --count 3
-
-The command is idempotent: re-running it will just reset the password and
-re-add the user to the "guest" Group.
-"""
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand, CommandError
@@ -23,9 +24,11 @@ from apps.accounts.permissions import GUEST_GROUP_NAME
 
 
 class Command(BaseCommand):
+    # Create (or reset) one or more read-only guest users for local development.
     help = "Create (or reset) one or more read-only guest users for local development."
 
     def add_arguments(self, parser):
+        # Wire up the CLI flags this command accepts.
         parser.add_argument(
             '--username',
             default='guest',
@@ -49,6 +52,11 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        # Ensure the local "guest" Group exists, then create or reset
+        # the requested user(s). Each account is forced read-only by
+        # clearing is_staff / is_superuser and adding it to the Group
+        # so the same permission machinery used in production (via
+        # OIDC claims) also catches dev-only accounts.
         User = get_user_model()
 
         base_username = options['username']
@@ -65,6 +73,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f'Created Group "{GUEST_GROUP_NAME}".'))
 
         for i in range(count):
+            # When creating only one guest, keep the username as given;
+            # when batching, suffix a number so usernames don't collide.
             if count == 1:
                 username = base_username
             else:

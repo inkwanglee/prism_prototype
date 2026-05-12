@@ -1,25 +1,39 @@
 #!/usr/bin/env python
-"""
-Demo data creation script
-"""
+# =============================================================================
+# Demo data creation script.
+# =============================================================================
+# Seeds the LEGACY schema registry (Schema + SchemaVersion + Dataset)
+# and a couple of QAQC / Lineage rows so the dashboard widgets show
+# something on a fresh install.
+#
+# NOTE: This does NOT populate the dynamic Schema.json-driven tables
+# (Collars_test1, Assay, etc.). To populate those, use the in-app
+# "Bulk Add" flow on the Datasets page.
+#
+# Usage:
+#     poetry run python scripts/create-demo-data.py
+# =============================================================================
+
 import os
 import django
 import json
 
+# Bootstrap Django before importing any app models.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'prism_site.settings')
 django.setup()
 
 from django.contrib.auth.models import User
 from apps.schemas.models import Schema, SchemaVersion
 from apps.datasets.models import Dataset
-from apps.ingestion.models import IngestionRun
 from apps.qaqc.models import QaqcRun
 from apps.lineage.models import Snapshot
 
+
 def create_demo_data():
     print("Creating demo data...")
-    
-    # Create user.
+
+    # Demo user. Created with a known password so the script can be
+    # re-run as part of a CI smoke test.
     user, created = User.objects.get_or_create(
         username='demo_user',
         defaults={'email': 'demo@example.com'}
@@ -28,8 +42,8 @@ def create_demo_data():
         user.set_password('demo123')
         user.save()
         print(f"Created user: {user.username}")
-    
-    # Create schema.
+
+    # Legacy Schema registry entry — distinct from Schema.json.
     schema, created = Schema.objects.get_or_create(
         key='drillhole.collar',
         defaults={
@@ -40,8 +54,9 @@ def create_demo_data():
     )
     if created:
         print(f"Created schema: {schema.key}")
-        
-        # Create schema version.
+
+        # Attach a starter JSON Schema version in the "approved" state
+        # so the dataset below can reference it via schema_ref.
         json_schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "type": "object",
@@ -55,7 +70,7 @@ def create_demo_data():
             },
             "required": ["hole_id", "project_id", "x", "y", "z"]
         }
-        
+
         version = SchemaVersion.objects.create(
             schema=schema,
             version='0.1.0',
@@ -65,8 +80,8 @@ def create_demo_data():
             notes='Initial schema version'
         )
         print(f"Created schema version: {version.version}")
-    
-    # Create dataset.
+
+    # Demo Dataset that references the schema above via its schema_ref.
     dataset, created = Dataset.objects.get_or_create(
         key='exploration.drillholes',
         defaults={
@@ -81,23 +96,8 @@ def create_demo_data():
     )
     if created:
         print(f"Created dataset: {dataset.key}")
-    
-    # Create ingestion run.
-    run, created = IngestionRun.objects.get_or_create(
-        source='ALS_Lab',
-        defaults={
-            'status': 'completed',
-            'total_rows': 150,
-            'success_rows': 145,
-            'failed_rows': 5,
-            'created_by': user,
-            'notes': 'Initial data import from ALS laboratory'
-        }
-    )
-    if created:
-        print(f"Created ingestion run: {run.id}")
-    
-    # Create QAQC run.
+
+    # Demo QAQC run so the QAQC dashboard isn't empty on a fresh install.
     qaqc, created = QaqcRun.objects.get_or_create(
         batch_id='BATCH-001',
         defaults={
@@ -109,8 +109,8 @@ def create_demo_data():
     )
     if created:
         print(f"Created QAQC run: {qaqc.batch_id}")
-    
-    # Create snapshot
+
+    # Demo lineage snapshot so the Lineage page isn't empty.
     snapshot, created = Snapshot.objects.get_or_create(
         snapshot_id='snap-20250101-001',
         defaults={
@@ -120,12 +120,13 @@ def create_demo_data():
     )
     if created:
         print(f"Created snapshot: {snapshot.snapshot_id}")
-    
+
     print("\n=== Demo data created successfully! ===")
     print("\nYou can now:")
     print("1. Login with: admin / admin123")
     print("2. Browse schemas at: http://localhost:8000/schemas/")
     print("3. View datasets at: http://localhost:8000/datasets/")
+
 
 if __name__ == '__main__':
     create_demo_data()

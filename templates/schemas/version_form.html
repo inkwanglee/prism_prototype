@@ -1,3 +1,4 @@
+{# Add-Version page: enter a semver + a JSON Schema document for an existing Schema. #}
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
 
@@ -9,13 +10,15 @@
                 <h5 class="mb-0">Add Version to {{ schema.key }}</h5>
             </div>
             <div class="card-body">
+                <!-- Hand-rolled form rendering (instead of crispy) so the layout stays simple. -->
                 <form method="post">
                     {% csrf_token %}
                     {{ form.as_p }}
                     <button type="submit" class="btn btn-primary">Create Version</button>
                     <a href="{% url 'schemas:detail' schema.pk %}" class="btn btn-secondary">Cancel</a>
                 </form>
-                
+
+                <!-- Example JSON Schema users can copy/paste as a starting point. -->
                 <div class="mt-4">
                     <h6>Example JSON Schema:</h6>
                     <pre class="bg-light p-3"><code>{

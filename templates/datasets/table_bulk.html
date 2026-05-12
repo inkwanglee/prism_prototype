@@ -1,3 +1,7 @@
+{# =================================================================== #}
+{# Bulk Add — two-phase CSV import. Phase 1: upload + parse in browser. #}
+{# Phase 2: editable grid of parsed rows. Confirm sends JSON to server. #}
+{# =================================================================== #}
 {% extends 'base.html' %}
 
 {% block page_actions %}
@@ -7,7 +11,7 @@
 {% endblock %}
 
 {% block content %}
-<!-- Phase 1: Upload -->
+<!-- Phase 1: Upload. CSV file picker; parsed in-browser before anything is sent. -->
 <div id="upload-section">
     <div class="row">
         <div class="col-md-8">
@@ -21,6 +25,7 @@
                 <div class="card-body">
                     <p>Upload a CSV file to preview and edit before importing.</p>
 
+                    <!-- Show the expected headers so users know what columns to include. -->
                     <div class="alert alert-info">
                         <strong>Expected CSV columns:</strong><br>
                         <code>{{ expected_headers|join:", " }}</code>
@@ -42,8 +47,9 @@
     </div>
 </div>
 
-<!-- Phase 2: Editable table (hidden until CSV parsed) -->
+<!-- Phase 2: editable table (hidden until CSV parsed). -->
 <div id="editor-section" class="d-none">
+    <!-- Toolbar: row count, Add Row, Clear All, Re-upload. -->
     <div class="card mb-3">
         <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
@@ -64,6 +70,7 @@
         </div>
     </div>
 
+    <!-- Editable grid. Header + body populated by JavaScript below. -->
     <div class="card">
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -75,6 +82,7 @@
         </div>
     </div>
 
+    <!-- Footer: validation summary on the left, Confirm Import on the right. -->
     <div class="card mt-3">
         <div class="card-body d-flex justify-content-between align-items-center">
             <div id="validation-summary" class="text-muted small"></div>
@@ -87,7 +95,7 @@
         </div>
     </div>
 
-    <!-- Hidden form for final submission -->
+    <!-- Hidden form for final submission — JS fills `bulk_data` with a JSON array of row dicts. -->
     <form id="submit-form" method="post" class="d-none">
         {% csrf_token %}
         <input type="hidden" name="bulk_data" id="bulk-data-input">
@@ -98,6 +106,7 @@
 {% block extra_js %}
 <script>
 (function() {
+    // FIELDS_META is rendered server-side from _build_input_meta — one entry per column.
     const FIELDS_META = {{ fields_meta_json|safe }};
     const FIELD_NAMES = FIELDS_META.map(f => f.name);
 
@@ -121,9 +130,17 @@
         const asStr = String(rawValue).trim();
         if (FK_ID_TO_LABEL[fieldName][asStr]) return FK_ID_TO_LABEL[fieldName][asStr];
         return rawValue;  // already a name or unknown — pass through
+    // Resolve a CSV value for an FK field: try display name first, then raw ID,
+    // otherwise pass through so the server can show a validation error.
+    function resolveFK(fieldName, rawValue) {
+        if (!rawValue || !FK_LOOKUP[fieldName]) return rawValue;
+        const key = String(rawValue).toLowerCase().trim();
+        if (FK_LOOKUP[fieldName][key] !== undefined) return FK_LOOKUP[fieldName][key];
+        return rawValue;  // pass through as-is if no match
     }
 
 
+    // DOM references cached up front for the rest of the script.
     const uploadSection  = document.getElementById('upload-section');
     const editorSection  = document.getElementById('editor-section');
     const fileInput       = document.getElementById('csv_file');
@@ -140,6 +157,7 @@
     const bulkDataInput   = document.getElementById('bulk-data-input');
 
     // ── CSV Parser (handles quoted fields, newlines in quotes) ──
+    // Hand-rolled so we don't pull in a heavy CSV lib. RFC 4180-ish.
     function parseCSV(text) {
         const rows = [];
         let i = 0;
@@ -148,6 +166,9 @@
             while (i < text.length) {
                 let val = '';
                 if (text[i] === '"') {
+                    // Quoted field — read until the matching closing quote.
+                    // Two consecutive quotes inside a quoted field mean an
+                    // escaped quote character.
                     i++;
                     while (i < text.length) {
                         if (text[i] === '"') {
@@ -157,6 +178,7 @@
                         } else { val += text[i]; i++; }
                     }
                 } else {
+                    // Unquoted field — read until comma or newline.
                     while (i < text.length && text[i] !== ',' && text[i] !== '\n' && text[i] !== '\r') {
                         val += text[i]; i++;
                     }
@@ -165,8 +187,10 @@
                 if (i < text.length && text[i] === ',') { i++; }
                 else break;
             }
+            // Consume CR/LF (or both) at the end of the row.
             if (i < text.length && text[i] === '\r') i++;
             if (i < text.length && text[i] === '\n') i++;
+            // Drop completely-empty rows (e.g. trailing newline at EOF).
             if (row.length > 0 && !(row.length === 1 && row[0] === '')) {
                 rows.push(row);
             }
@@ -175,6 +199,7 @@
     }
 
     // ── Render header ──
+    // Builds a <tr> with one <th> per schema field plus the row-number and delete columns.
     function renderHeader() {
         editThead.innerHTML = '';
         const tr = document.createElement('tr');
@@ -183,6 +208,7 @@
             const th = document.createElement('th');
             th.style.minWidth = '120px';
             let label = f.name;
+            // Add visual badges so users can see which columns are PK/FK/auto.
             if (f.is_pk) label += ' <span class="badge bg-secondary">PK</span>';
             if (f.is_fk) label += ' <span class="badge bg-info text-dark">FK</span>';
             if (f.auto_generated) label += ' <span class="badge bg-dark">AUTO</span>';
@@ -194,6 +220,7 @@
     }
 
     // ── Create one row of inputs ──
+    // Each cell gets the right control type based on FIELDS_META.
     function createRow(values) {
         const tr = document.createElement('tr');
         const numTd = document.createElement('td');
@@ -222,6 +249,7 @@
             }
 
             if (f.base_type === 'bool') {
+                // Boolean -> checkbox. Pre-check on truthy strings.
                 const cb = document.createElement('input');
                 cb.type = 'checkbox';
                 cb.className = 'form-check-input';
@@ -250,6 +278,7 @@
                 td.appendChild(inp);
                 td.appendChild(dl);
             }else {
+                // Default: text / number / date input. Step set for numeric types.
                 const inp = document.createElement('input');
                 inp.type = f.input_type;
                 inp.className = 'form-control form-control-sm';
@@ -263,7 +292,7 @@
             tr.appendChild(td);
         });
 
-        // Delete button
+        // Delete-row button at the end of each row.
         const delTd = document.createElement('td');
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
@@ -283,6 +312,7 @@
         return tr;
     }
 
+    // Renumber the leading column (1, 2, 3, ...) after any row add/remove.
     function renumberRows() {
         const rows = editTbody.querySelectorAll('tr');
         rows.forEach((tr, i) => {
@@ -291,6 +321,7 @@
         rowCountBadge.textContent = rows.length + ' row' + (rows.length !== 1 ? 's' : '');
     }
 
+    // Show a small footer status: how many rows are "empty" (no user-editable values).
     function updateSummary() {
         const rows = editTbody.querySelectorAll('tr');
         let empty = 0;
@@ -299,7 +330,7 @@
             let allEmpty = true;
             inputs.forEach(inp => {
                 if (inp.type === 'checkbox') return;
-                // Ignore auto-generated (read-only) fields when judging emptiness
+                // Ignore auto-generated (read-only) fields when judging emptiness.
                 if (inp.readOnly) return;
                 if (inp.value.trim() !== '') allEmpty = false;
             });
@@ -312,6 +343,8 @@
         }
     }
 
+    // Collect every visible row's values into a JSON-friendly array of dicts.
+    // Rows that are completely empty are dropped.
     function collectData() {
         const rows = editTbody.querySelectorAll('tr');
         const data = [];
@@ -331,6 +364,9 @@
         return data;
     }
 
+    // Map CSV header names onto schema field names using a tolerant match
+    // (case-insensitive, ignores spaces / underscores / hyphens). Headers
+    // that don't match anything are reported as warnings.
     function mapHeaders(csvHeaders) {
         const mapping = {};
         const normalize = s => s.toLowerCase().replace(/[\s_-]+/g, '');
@@ -349,6 +385,7 @@
         return { mapping, warnings };
     }
 
+    // File input handler — parse the CSV and switch to phase 2.
     fileInput.addEventListener('change', function() {
         parseError.classList.add('d-none');
         const file = this.files[0];
@@ -357,6 +394,7 @@
         const reader = new FileReader();
         reader.onload = function(e) {
             try {
+                // Strip the optional UTF-8 BOM that some Excel exports add.
                 const text = e.target.result.replace(/^\uFEFF/, '');
                 const parsed = parseCSV(text);
                 if (parsed.length < 2) {
@@ -368,6 +406,8 @@
                 const { mapping, warnings } = mapHeaders(csvHeaders);
 
                 if (Object.keys(mapping).length === 0) {
+                    // Nothing matched — show the user both lists so they
+                    // can figure out the mismatch.
                     showParseError(
                         'No CSV columns matched the schema fields.<br>' +
                         '<strong>CSV columns:</strong> ' + csvHeaders.join(', ') + '<br>' +
@@ -379,6 +419,8 @@
                 renderHeader();
                 editTbody.innerHTML = '';
 
+                // Convert each parsed data row into a {fieldName: value} dict
+                // and feed it through createRow.
                 for (let r = 1; r < parsed.length; r++) {
                     const vals = {};
                     csvHeaders.forEach((h, ci) => {
@@ -392,6 +434,8 @@
                 uploadSection.classList.add('d-none');
                 editorSection.classList.remove('d-none');
 
+                // Surface any ignored columns as a warning so the user
+                // notices and can fix the CSV if they meant to include them.
                 if (warnings.length > 0) {
                     showParseError('Ignored unrecognized columns: ' + warnings.join(', '), 'warning');
                 }
@@ -403,6 +447,7 @@
         reader.readAsText(file);
     });
 
+    // Helper for showing parse errors / warnings in the upload section.
     function showParseError(msg, type) {
         type = type || 'danger';
         parseError.className = 'alert alert-' + type;
@@ -410,10 +455,12 @@
         parseError.classList.remove('d-none');
     }
 
+    // Toolbar button handlers.
     btnAddRow.addEventListener('click', () => {
         createRow({});
         const lastRow = editTbody.querySelector('tr:last-child');
         if (lastRow) {
+            // Smooth-scroll to the new row and focus its first editable input.
             lastRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             const firstInput = lastRow.querySelector('input:not([type=checkbox]):not([readonly]), select');
             if (firstInput) firstInput.focus();
@@ -429,6 +476,7 @@
     });
 
     btnReupload.addEventListener('click', () => {
+        // Go back to phase 1; clear any state from phase 2.
         editorSection.classList.add('d-none');
         uploadSection.classList.remove('d-none');
         fileInput.value = '';
@@ -436,6 +484,7 @@
         parseError.classList.add('d-none');
     });
 
+    // Confirm Import — bundle every non-empty row into JSON and submit.
     btnConfirm.addEventListener('click', () => {
         const data = collectData();
         if (data.length === 0) {

@@ -130,6 +130,7 @@
         const asStr = String(rawValue).trim();
         if (FK_ID_TO_LABEL[fieldName][asStr]) return FK_ID_TO_LABEL[fieldName][asStr];
         return rawValue;  // already a name or unknown — pass through
+    }
     // Resolve a CSV value for an FK field: try display name first, then raw ID,
     // otherwise pass through so the server can show a validation error.
     function resolveFK(fieldName, rawValue) {

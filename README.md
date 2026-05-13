@@ -19,9 +19,11 @@ The project scope for this iteration covered:
 
 ### Links
 
-* **Demo Video:** _(to be added — record before final handover)_
-* **Notion workspace:** _(to be added — internal team workspace)_
-* **Repository:** `https://github.com/inkwanglee/prism_prototype`
+* **Demo Video:** https://drive.google.com/file/d/13PUaUarc4zoKteDFv9T4iw5XZdLXwKfg/view?usp=sharing 
+* **Notion workspace:** https://www.notion.so/orefox/Prism-25b05cef1f2280ebab83de2bdebbec02  
+* **Repository:** https://github.com/inkwanglee/prism_prototype
+* **Cloud URL:** https://prism-web.kindground-d178727f.australiaeast.azurecontainerapps.io 
+
 
 ---
 

@@ -23,6 +23,10 @@ The project scope for this iteration covered:
 * **Notion workspace:** https://www.notion.so/orefox/Prism-25b05cef1f2280ebab83de2bdebbec02  
 * **Repository:** https://github.com/inkwanglee/prism_prototype
 * **Cloud URL:** https://prism-web.kindground-d178727f.australiaeast.azurecontainerapps.io 
+* **Test Cases:** https://docs.google.com/spreadsheets/d/1Nc87LbowZB4dYl9EoC4_D88mOq23Wlm3/edit?usp=sharing&ouid=100433973355983979823&rtpof=true&sd=true 
+* **Sprint Roster:** https://docs.google.com/spreadsheets/d/1F-YgqsAQ5ITRycCF53103KPKFlSbhjrb4-fefcK9GJg/edit?gid=0#gid=0 
+
+
 
 
 ---
